@@ -1,0 +1,48 @@
+{
+  "name": "my-project",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:init": "node scripts/init-db.js",
+    "db:reset": "rm -f rentbw.db && node scripts/init-db.js",
+    "seed:messages": "node scripts/seed-messages.cjs",
+    "seed:all": "node scripts/seed-all.cjs",
+    "seed:apps": "node scripts/seed-applications.cjs",
+    "seed:investor": "node scripts/seed-investor-data.cjs",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.28.6",
+    "@fortawesome/fontawesome-svg-core": "^7.1.0",
+    "@fortawesome/free-solid-svg-icons": "^7.1.0",
+    "@fortawesome/react-fontawesome": "^3.2.0",
+    "@heroicons/react": "^2.2.0",
+    "@prisma/client": "^7.4.2",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/nodemailer": "^7.0.11",
+    "@untitled-ui/icons-react": "^0.1.4",
+    "bcryptjs": "^3.0.3",
+    "cookie": "^1.1.1",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.563.0",
+    "next": "16.1.6",
+    "nodemailer": "^8.0.1",
+    "prisma": "^7.4.2",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.24",
+    "babel-plugin-react-compiler": "1.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "16.1.6",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.19"
+  }
+}
