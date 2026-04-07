@@ -5,6 +5,7 @@ import { getAuthUser } from '@/app/lib/utils/getAuthUser';
 
 export async function GET(request, { params }) {
   try {
+    const { id } = await params;
     const user = await getAuthUser(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -14,7 +15,7 @@ export async function GET(request, { params }) {
        FROM applications a
        JOIN properties p ON a.property_id = p.id
        WHERE a.id = ? AND a.tenant_id = ?`,
-      [params.id, user.id]
+      [id, user.id]
     );
     if (!application) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json({ application });
@@ -26,20 +27,21 @@ export async function GET(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
+    const { id } = await params;
     const user = await getAuthUser(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const db = await getDb();
     const application = await db.get(
       'SELECT * FROM applications WHERE id = ? AND tenant_id = ?',
-      [params.id, user.id]
+      [id, user.id]
     );
     if (!application) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     if (application.status !== 'pending') {
       return NextResponse.json({ error: 'Cannot withdraw a processed application' }, { status: 400 });
     }
 
-    await db.run('DELETE FROM applications WHERE id = ?', params.id);
+    await db.run('DELETE FROM applications WHERE id = ?', id);
     return NextResponse.json({ message: 'Withdrawn' });
   } catch (err) {
     console.error('Application DELETE error:', err);

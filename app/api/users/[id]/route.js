@@ -4,10 +4,11 @@ import { getDb } from '@/app/lib/utils/db';
 
 export async function GET(request, { params }) {
   try {
+    const { id } = await params;
     const db = await getDb();
     const user = await db.get(
       'SELECT id, name, role, verified, created_at FROM users WHERE id = ?',
-      params.id
+      id
     );
     if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json({ user });

@@ -5,10 +5,11 @@ import { randomUUID } from 'crypto';
 
 export async function POST(request, { params }) {
   try {
+    const { id } = await params;
     const db = await getDb();
     await db.run(
       'INSERT INTO property_views (id, property_id, created_at) VALUES (?, ?, ?)',
-      [randomUUID(), params.id, Date.now()]
+      [randomUUID(), id, Date.now()]
     );
     return NextResponse.json({ recorded: true });
   } catch (err) {

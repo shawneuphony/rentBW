@@ -1,4 +1,4 @@
-// app/api/messages/[id]/read/route.js
+// app/api/properties/[id]/read/route.js
 import { NextResponse } from 'next/server';
 import { getDb } from '@/app/lib/utils/db';
 import { verifyToken } from '@/app/lib/utils/auth';
@@ -14,11 +14,12 @@ function getAuthUser(request) {
 // PATCH — mark a message as read (only the receiver can do this)
 export async function PATCH(request, { params }) {
   try {
+    const { id } = await params;
     const user = getAuthUser(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const db  = await getDb();
-    const msg = await db.get('SELECT * FROM messages WHERE id = ?', params.id);
+    const msg = await db.get('SELECT * FROM messages WHERE id = ?', id);
 
     if (!msg) {
       return NextResponse.json({ error: 'Message not found' }, { status: 404 });
@@ -29,7 +30,7 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    await db.run('UPDATE messages SET read = 1 WHERE id = ?', params.id);
+    await db.run('UPDATE messages SET read = 1 WHERE id = ?', id);
 
     return NextResponse.json({ success: true });
   } catch (err) {
