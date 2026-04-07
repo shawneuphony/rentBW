@@ -27,6 +27,9 @@ export async function getDb() {
       phone TEXT,
       role TEXT NOT NULL DEFAULT 'tenant',
       verified INTEGER DEFAULT 0,
+      avatar TEXT,
+      id_document TEXT,
+      id_document_status TEXT DEFAULT 'none',
       verification_token TEXT,
       reset_token TEXT,
       reset_token_exp INTEGER,
@@ -104,6 +107,13 @@ export async function getDb() {
       FOREIGN KEY (property_id) REFERENCES properties(id)
     );
   `);
+
+  // Migrations: add columns if they don't exist
+  const userCols = await db.all("PRAGMA table_info(users)");
+  const colNames = userCols.map(c => c.name);
+  if (!colNames.includes('avatar')) await db.run("ALTER TABLE users ADD COLUMN avatar TEXT");
+  if (!colNames.includes('id_document')) await db.run("ALTER TABLE users ADD COLUMN id_document TEXT");
+  if (!colNames.includes('id_document_status')) await db.run("ALTER TABLE users ADD COLUMN id_document_status TEXT DEFAULT 'none'");
 
   const userCount = await db.get('SELECT COUNT(*) as count FROM users');
   if (userCount.count === 0) {

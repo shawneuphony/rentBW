@@ -6,7 +6,6 @@ import {
   MagnifyingGlassIcon,
   CheckCircleIcon,
   XCircleIcon,
-  TrashIcon,
   FunnelIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckSolid } from '@heroicons/react/24/solid';
@@ -33,7 +32,6 @@ export default function AdminUsersPage() {
   const [search,  setSearch]  = useState('');
   const [role,    setRole]    = useState('');
   const [busy,    setBusy]    = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [toast,   setToast]   = useState(null);
 
   const showToast = (message, type = 'success') => {
@@ -74,27 +72,6 @@ export default function AdminUsersPage() {
       showToast(`User ${action}d successfully`);
     } catch (err) {
       showToast(err.message || `Failed to ${action} user`, 'error');
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const handleDelete = async (userId) => {
-    setBusy(userId + 'delete');
-    try {
-      const res = await fetch('/api/admin/users', {
-        method:  'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ userId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      setDeleteConfirm(null);
-      showToast('User deleted');
-    } catch (err) {
-      showToast(err.message || 'Failed to delete user', 'error');
     } finally {
       setBusy(null);
     }
@@ -220,33 +197,7 @@ export default function AdminUsersPage() {
                               {busy === u.id + 'suspend' ? '...' : 'Suspend'}
                             </button>
                           )}
-                          <button
-                            onClick={() => setDeleteConfirm(u.id)}
-                            className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
                         </>
-                      )}
-
-                      {/* Delete confirm inline */}
-                      {deleteConfirm === u.id && (
-                        <div className="inline-flex items-center gap-2 ml-2">
-                          <span className="text-xs text-red-600">Delete?</span>
-                          <button
-                            onClick={() => handleDelete(u.id)}
-                            disabled={!!busy}
-                            className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded disabled:opacity-50"
-                          >
-                            {busy === u.id + 'delete' ? '...' : 'Yes'}
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm(null)}
-                            className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded"
-                          >
-                            No
-                          </button>
-                        </div>
                       )}
                     </td>
                   </tr>
