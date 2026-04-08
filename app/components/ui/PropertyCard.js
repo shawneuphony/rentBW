@@ -23,9 +23,14 @@ const PLACEHOLDER =
 export default function PropertyCard({ property, onSaveToggle }) {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [imgSrc, setImgSrc] = useState(
-    property.image || property.images?.[0] || PLACEHOLDER
-  );
+  const [imgSrc, setImgSrc] = useState(() => {
+    if (property.image) return property.image;
+    if (Array.isArray(property.images) && property.images.length > 0) return property.images[0];
+    if (typeof property.images === 'string') {
+      try { const a = JSON.parse(property.images); return Array.isArray(a) && a.length > 0 ? a[0] : PLACEHOLDER; } catch { return PLACEHOLDER; }
+    }
+    return PLACEHOLDER;
+  });
   const { user } = useAuth();
   const router = useRouter();
 

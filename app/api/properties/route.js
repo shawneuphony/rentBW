@@ -24,9 +24,34 @@ export async function GET(request) {
     if (maxPrice) { query += ' AND price <= ?';        params.push(Number(maxPrice)); }
     if (beds)     { query += ' AND beds >= ?';         params.push(Number(beds)); }
 
-    query += ' ORDER BY created_at DESC';
+    const sort  = searchParams.get('sort');
+    const limit = searchParams.get('limit');
 
-    const properties = await db.all(query, params);
+    if (sort === 'trending') {
+      query += ' ORDER BY views DESC, created_at DESC';
+    } else {
+      query += ' ORDER BY created_at DESC';
+    }
+
+    if (limit) {
+      query += ` LIMIT ${Math.min(Math.abs(parseInt(limit, 10)) || 6, 50)}`;
+    }
+
+    const rawProperties = await db.all(query, params);
+
+    // Parse JSON fields so clients get arrays, not strings
+    const properties = rawProperties.map(p => ({
+      ...p,
+      images: (() => {
+        if (Array.isArray(p.images)) return p.images;
+        try { const a = JSON.parse(p.images); return Array.isArray(a) ? a : []; } catch { return []; }
+      })(),
+      amenities: (() => {
+        if (Array.isArray(p.amenities)) return p.amenities;
+        try { const a = JSON.parse(p.amenities); return Array.isArray(a) ? a : []; } catch { return []; }
+      })(),
+    }));
+
     return NextResponse.json({ properties });
   } catch (err) {
     console.error('Properties GET error:', err);
@@ -42,28 +67,41 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Fix #4 — enforce ID approval on the server side too
+    if (user.role === 'landlord' && user.id_document_status !== 'approved') {
+      return NextResponse.json(
+        { error: 'Your identification must be approved before you can add listings.' },
+        { status: 403 }
+      );
+    }
+
     const db   = await getDb();
     const body = await request.json();
-    const { title, description, price, location, beds, baths, sqm, type, amenities, images } = body;
+    const { title, description, price, location, beds, baths, sqm, type, amenities, images, lease_url } = body;
 
     if (!title || !price || !location) {
       return NextResponse.json({ error: 'Title, price and location are required' }, { status: 400 });
     }
 
+    // Fix #5 — require lease document on the server side too
+    if (!lease_url) {
+      return NextResponse.json({ error: 'A lease agreement document is required.' }, { status: 400 });
+    }
+
     const id  = randomUUID();
     const now = Date.now();
 
-    // Always insert as 'pending' so admin must approve before going live
     await db.run(
       `INSERT INTO properties
          (id, title, description, price, location, beds, baths, sqm, type,
-          status, images, amenities, landlord_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+          status, images, amenities, lease_url, landlord_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
       [
         id, title, description || '', price, location,
         beds || 0, baths || 0, sqm || 0, type || 'apartment',
         JSON.stringify(images    || []),
         JSON.stringify(amenities || []),
+        lease_url || '',
         user.id, now, now,
       ]
     );

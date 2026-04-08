@@ -30,6 +30,14 @@ export async function POST(request) {
     const user = await getAuthUser(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Fix #3 — enforce ID approval server-side
+    if (user.id_document_status !== 'approved') {
+      return NextResponse.json(
+        { error: 'Your identification must be approved before you can apply for properties.' },
+        { status: 403 }
+      );
+    }
+
     const db = await getDb();
     const { property_id, notes, documents } = await request.json();
 

@@ -21,18 +21,20 @@ export async function GET(request) {
     const db = await getDb();
     const { searchParams } = new URL(request.url);
 
-    const role     = searchParams.get('role');
-    const verified = searchParams.get('verified');
-    const search   = searchParams.get('search');
-    const limit    = parseInt(searchParams.get('limit') ?? '50', 10);
-    const offset   = parseInt(searchParams.get('offset') ?? '0',  10);
+    const role       = searchParams.get('role');
+    const verified   = searchParams.get('verified');
+    const search     = searchParams.get('search');
+    const pendingId  = searchParams.get('pending_id');
+    const limit      = parseInt(searchParams.get('limit') ?? '100', 10);
+    const offset     = parseInt(searchParams.get('offset') ?? '0',  10);
 
-    let query  = 'SELECT id, name, email, role, verified, phone, created_at FROM users WHERE 1=1';
+    let query  = 'SELECT id, name, email, role, verified, phone, created_at, id_document, id_document_status FROM users WHERE 1=1';
     const params = [];
 
     if (role)     { query += ' AND role = ?';           params.push(role); }
     if (verified !== null && verified !== undefined && verified !== '') {
                     query += ' AND verified = ?';        params.push(Number(verified)); }
+    if (pendingId) { query += " AND id_document_status = 'pending' AND id_document IS NOT NULL"; }
     if (search)   { query += ' AND (name LIKE ? OR email LIKE ?)';
                     params.push(`%${search}%`, `%${search}%`); }
 
@@ -94,12 +96,24 @@ export async function PATCH(request) {
           [now, userId]
         );
         break;
+      case 'approve_id':
+        await db.run(
+          "UPDATE users SET id_document_status = 'approved', updated_at = ? WHERE id = ?",
+          [now, userId]
+        );
+        break;
+      case 'reject_id':
+        await db.run(
+          "UPDATE users SET id_document_status = 'rejected', updated_at = ? WHERE id = ?",
+          [now, userId]
+        );
+        break;
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
     }
 
     const updated = await db.get(
-      'SELECT id, name, email, role, verified, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, role, verified, created_at, id_document, id_document_status FROM users WHERE id = ?',
       userId
     );
 

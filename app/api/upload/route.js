@@ -32,11 +32,11 @@ export async function POST(request) {
     for (const file of files) {
       if (!file || typeof file === 'string') continue;
 
-      // Validate file type
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      // Validate file type (images + PDF for lease documents)
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
       if (!validTypes.includes(file.type)) {
         return NextResponse.json(
-          { error: `Invalid file type: ${file.type}. Only JPG, PNG, and WebP are allowed.` },
+          { error: `Invalid file type: ${file.type}. Only JPG, PNG, WebP, and PDF are allowed.` },
           { status: 400 }
         );
       }
@@ -49,7 +49,7 @@ export async function POST(request) {
         );
       }
 
-      const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
+      const ext = file.type === 'application/pdf' ? 'pdf' : (file.name.split('.').pop().toLowerCase() || 'jpg');
       const fileName = `${randomUUID()}.${ext}`;
       const filePath = path.join(uploadDir, fileName);
 

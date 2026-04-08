@@ -7,8 +7,17 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   FunnelIcon,
+  IdentificationIcon,
+  EyeIcon,
+  XMarkIcon,
+  ClockIcon,
+  ShieldCheckIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
-import { CheckCircleIcon as CheckSolid } from '@heroicons/react/24/solid';
+import {
+  CheckCircleIcon as CheckSolid,
+  ShieldCheckIcon as ShieldSolid,
+} from '@heroicons/react/24/solid';
 
 function getInitials(name = '') {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -26,13 +35,108 @@ const ROLE_COLORS = {
   admin:    'bg-red-100 text-red-700',
 };
 
+const ID_STATUS = {
+  none:     { label: 'Not uploaded',   cls: 'bg-slate-100 text-slate-500' },
+  pending:  { label: 'Pending Review', cls: 'bg-amber-100 text-amber-700' },
+  approved: { label: 'Approved',       cls: 'bg-green-100 text-green-700' },
+  rejected: { label: 'Rejected',       cls: 'bg-red-100   text-red-700'   },
+};
+
+// ── Document Viewer Modal ──────────────────────────────────────────────────────
+function DocModal({ user, onClose, onApprove, onReject, busy }) {
+  if (!user) return null;
+  const isPDF = user.id_document?.startsWith('data:application/pdf');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">ID Document Review</h3>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {user.name} &middot; <span className="capitalize">{user.role}</span> &middot; {user.email}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition">
+            <XMarkIcon className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+
+        {/* Document preview */}
+        <div className="flex-1 overflow-auto p-6 bg-slate-50 min-h-0">
+          {user.id_document ? (
+            isPDF ? (
+              <iframe
+                src={user.id_document}
+                className="w-full h-96 rounded-lg border border-slate-200"
+                title="ID Document"
+              />
+            ) : (
+              <img
+                src={user.id_document}
+                alt="ID Document"
+                className="max-w-full max-h-[55vh] object-contain mx-auto rounded-lg border border-slate-200 shadow-sm"
+              />
+            )
+          ) : (
+            <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+              <IdentificationIcon className="w-12 h-12 mb-2" />
+              <p className="text-sm">No document uploaded</p>
+            </div>
+          )}
+        </div>
+
+        {/* Current status */}
+        <div className="px-6 py-3 border-t border-slate-100 flex items-center gap-2 bg-white">
+          <span className="text-sm text-slate-500">Current status:</span>
+          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${ID_STATUS[user.id_document_status ?? 'none']?.cls}`}>
+            {ID_STATUS[user.id_document_status ?? 'none']?.label}
+          </span>
+        </div>
+
+        {/* Actions */}
+        <div className="px-6 py-4 border-t border-slate-200 flex gap-3 bg-white rounded-b-2xl">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50 transition"
+          >
+            Close
+          </button>
+          <button
+            onClick={() => onReject(user.id)}
+            disabled={!!busy || user.id_document_status === 'rejected' || !user.id_document}
+            className="flex-1 py-2.5 bg-red-50 border border-red-200 text-red-700 font-bold rounded-xl hover:bg-red-100 disabled:opacity-40 transition text-sm flex items-center justify-center gap-2"
+          >
+            <XCircleIcon className="w-4 h-4" />
+            {busy === user.id + 'reject_id' ? 'Rejecting...' : 'Reject ID'}
+          </button>
+          <button
+            onClick={() => onApprove(user.id)}
+            disabled={!!busy || user.id_document_status === 'approved' || !user.id_document}
+            className="flex-1 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 disabled:opacity-40 transition text-sm flex items-center justify-center gap-2"
+          >
+            <ShieldSolid className="w-4 h-4" />
+            {busy === user.id + 'approve_id' ? 'Approving...' : 'Approve ID'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
-  const [users,   setUsers]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search,  setSearch]  = useState('');
-  const [role,    setRole]    = useState('');
-  const [busy,    setBusy]    = useState(null);
-  const [toast,   setToast]   = useState(null);
+  const [users,     setUsers]     = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [search,    setSearch]    = useState('');
+  const [role,      setRole]      = useState('');
+  const [idFilter,  setIdFilter]  = useState('');
+  const [busy,      setBusy]      = useState(null);
+  const [toast,     setToast]     = useState(null);
+  const [docUser,   setDocUser]   = useState(null);
+  const [activeTab, setActiveTab] = useState('all');
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -45,22 +149,32 @@ export default function AdminUsersPage() {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (role)   params.set('role', role);
-      const res = await fetch(`/api/admin/users?${params}`, { credentials: 'include' });
+      if (activeTab === 'pending_docs') params.set('pending_id', '1');
+
+      const res  = await fetch(`/api/admin/users?${params}`, { credentials: 'include' });
       const data = await res.json();
-      setUsers(data.users ?? []);
+
+      let list = data.users ?? [];
+
+      // Client-side id_document_status filter (for the 'all' tab)
+      if (activeTab === 'all' && idFilter) {
+        list = list.filter(u => (u.id_document_status ?? 'none') === idFilter);
+      }
+
+      setUsers(list);
     } catch {
       showToast('Failed to load users', 'error');
     } finally {
       setLoading(false);
     }
-  }, [search, role]);
+  }, [search, role, idFilter, activeTab]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const handleAction = async (userId, action) => {
     setBusy(userId + action);
     try {
-      const res = await fetch('/api/admin/users', {
+      const res  = await fetch('/api/admin/users', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -68,31 +182,88 @@ export default function AdminUsersPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, verified: data.user.verified } : u));
-      showToast(`User ${action}d successfully`);
+
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...data.user } : u));
+      if (docUser?.id === userId) setDocUser(prev => ({ ...prev, ...data.user }));
+
+      const msgs = {
+        approve:    'User activated',
+        suspend:    'User suspended',
+        approve_id: 'ID document approved ✓',
+        reject_id:  'ID document rejected',
+      };
+      showToast(msgs[action] ?? `Action applied`);
     } catch (err) {
-      showToast(err.message || `Failed to ${action} user`, 'error');
+      showToast(err.message || `Failed to ${action}`, 'error');
     } finally {
       setBusy(null);
     }
   };
 
+  const handleApproveId = uid => handleAction(uid, 'approve_id');
+  const handleRejectId  = uid => handleAction(uid, 'reject_id');
+
+  // Count users with pending ID docs (from the full unfiltered list when on pending tab)
+  const pendingDocCount = activeTab === 'pending_docs'
+    ? users.length
+    : users.filter(u => u.id_document_status === 'pending' && u.id_document).length;
+
   return (
     <div className="space-y-6">
+
       {/* Toast */}
       {toast && (
         <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-sm flex items-center gap-2 ${
-          toast.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+          toast.type === 'success'
+            ? 'bg-green-50 text-green-800 border border-green-200'
+            : 'bg-red-50 text-red-800 border border-red-200'
         }`}>
           {toast.type === 'success' ? <CheckSolid className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
           {toast.message}
         </div>
       )}
 
+      {/* Doc modal */}
+      {docUser && (
+        <DocModal
+          user={docUser}
+          onClose={() => setDocUser(null)}
+          onApprove={handleApproveId}
+          onReject={handleRejectId}
+          busy={busy}
+        />
+      )}
+
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-slate-900">Users</h1>
-        <p className="text-slate-500 mt-1">Manage all registered users</p>
+        <p className="text-slate-500 mt-1">Manage users and review identity documents</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-slate-200">
+        {[
+          { key: 'all',          label: 'All Users',         Icon: UserGroupIcon },
+          { key: 'pending_docs', label: 'Pending ID Review', Icon: ClockIcon     },
+        ].map(({ key, label, Icon }) => (
+          <button
+            key={key}
+            onClick={() => { setActiveTab(key); setIdFilter(''); }}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+              activeTab === key
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+            {key === 'pending_docs' && pendingDocCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full leading-none">
+                {pendingDocCount}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Filters */}
@@ -107,7 +278,7 @@ export default function AdminUsersPage() {
             className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <FunnelIcon className="w-4 h-4 text-slate-400" />
           <select
             value={role}
@@ -120,8 +291,21 @@ export default function AdminUsersPage() {
             <option value="investor">Investor</option>
             <option value="admin">Admin</option>
           </select>
+          {activeTab === 'all' && (
+            <select
+              value={idFilter}
+              onChange={e => setIdFilter(e.target.value)}
+              className="border border-slate-200 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">All ID Statuses</option>
+              <option value="pending">Pending Review</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="none">Not Uploaded</option>
+            </select>
+          )}
         </div>
-        <div className="text-sm text-slate-500 self-center">{users.length} users</div>
+        <div className="text-sm text-slate-500 self-center whitespace-nowrap">{users.length} users</div>
       </div>
 
       {/* Table */}
@@ -136,8 +320,13 @@ export default function AdminUsersPage() {
             <table className="w-full">
               <thead className="bg-slate-50">
                 <tr>
-                  {['User', 'Role', 'Phone', 'Joined', 'Status', 'Actions'].map(h => (
-                    <th key={h} className={`px-6 py-4 text-xs font-bold text-slate-500 uppercase ${h === 'Actions' ? 'text-right' : 'text-left'}`}>
+                  {['User', 'Role', 'Account', 'ID Document', 'Joined', 'Actions'].map(h => (
+                    <th
+                      key={h}
+                      className={`px-5 py-4 text-xs font-bold text-slate-500 uppercase tracking-wide ${
+                        h === 'Actions' ? 'text-right' : 'text-left'
+                      }`}
+                    >
                       {h}
                     </th>
                   ))}
@@ -146,62 +335,132 @@ export default function AdminUsersPage() {
               <tbody className="divide-y divide-slate-100">
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-400">No users found</td>
+                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
+                      {activeTab === 'pending_docs'
+                        ? 'No pending ID documents — all clear!'
+                        : 'No users found'}
+                    </td>
                   </tr>
-                ) : users.map(u => (
-                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0">
-                          {getInitials(u.name)}
+                ) : users.map(u => {
+                  const idSt = ID_STATUS[u.id_document_status ?? 'none'];
+                  const hasPendingId = u.id_document_status === 'pending' && u.id_document;
+
+                  return (
+                    <tr key={u.id} className={`hover:bg-slate-50 transition-colors ${hasPendingId ? 'bg-amber-50/40' : ''}`}>
+
+                      {/* User */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="size-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0">
+                            {getInitials(u.name)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{u.name}</p>
+                            <p className="text-xs text-slate-400">{u.email}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{u.name}</p>
-                          <p className="text-xs text-slate-400">{u.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 text-xs font-bold rounded-full capitalize ${ROLE_COLORS[u.role] || 'bg-slate-100 text-slate-600'}`}>
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{u.phone || '—'}</td>
-                    <td className="px-6 py-4 text-xs text-slate-500">{formatDate(u.created_at)}</td>
-                    <td className="px-6 py-4">
-                      {u.verified ? (
-                        <span className="flex items-center gap-1 text-xs font-bold text-green-600">
-                          <CheckCircleIcon className="w-4 h-4" /> Verified
+                      </td>
+
+                      {/* Role */}
+                      <td className="px-5 py-4">
+                        <span className={`px-2 py-1 text-xs font-bold rounded-full capitalize ${ROLE_COLORS[u.role] || 'bg-slate-100 text-slate-600'}`}>
+                          {u.role}
                         </span>
-                      ) : (
-                        <span className="px-2 py-1 text-xs font-bold rounded bg-amber-100 text-amber-700">Pending</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      {u.role !== 'admin' && (
-                        <>
-                          {!u.verified ? (
+                      </td>
+
+                      {/* Account status */}
+                      <td className="px-5 py-4">
+                        {u.verified
+                          ? <span className="flex items-center gap-1 text-xs font-bold text-green-600"><CheckCircleIcon className="w-4 h-4" /> Active</span>
+                          : <span className="px-2 py-1 text-xs font-bold rounded bg-amber-100 text-amber-700">Suspended</span>
+                        }
+                      </td>
+
+                      {/* ID Document */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 text-xs font-bold rounded-full ${idSt.cls}`}>
+                            {idSt.label}
+                          </span>
+                          {u.id_document && (
                             <button
-                              onClick={() => handleAction(u.id, 'approve')}
-                              disabled={!!busy}
-                              className="px-3 py-1 bg-primary text-white text-xs font-bold rounded hover:bg-primary/90 disabled:opacity-50 transition"
+                              onClick={() => setDocUser(u)}
+                              title="View document"
+                              className="p-1 hover:bg-slate-100 rounded-lg transition text-slate-500 hover:text-primary"
                             >
-                              {busy === u.id + 'approve' ? '...' : 'Approve'}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleAction(u.id, 'suspend')}
-                              disabled={!!busy}
-                              className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded hover:bg-amber-200 disabled:opacity-50 transition"
-                            >
-                              {busy === u.id + 'suspend' ? '...' : 'Suspend'}
+                              <EyeIcon className="w-3.5 h-3.5" />
                             </button>
                           )}
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          {hasPendingId && (
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Joined */}
+                      <td className="px-5 py-4 text-xs text-slate-500">{formatDate(u.created_at)}</td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
+
+                          {/* Quick ID approve/reject when pending */}
+                          {hasPendingId && (
+                            <>
+                              <button
+                                onClick={() => handleApproveId(u.id)}
+                                disabled={!!busy}
+                                className="flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 disabled:opacity-50 transition"
+                              >
+                                <ShieldCheckIcon className="w-3 h-3" />
+                                {busy === u.id + 'approve_id' ? '…' : 'Approve ID'}
+                              </button>
+                              <button
+                                onClick={() => handleRejectId(u.id)}
+                                disabled={!!busy}
+                                className="flex items-center gap-1 px-2.5 py-1 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-100 disabled:opacity-50 transition"
+                              >
+                                <XCircleIcon className="w-3 h-3" />
+                                {busy === u.id + 'reject_id' ? '…' : 'Reject ID'}
+                              </button>
+                            </>
+                          )}
+
+                          {/* View doc button when doc exists but not pending */}
+                          {u.id_document && !hasPendingId && (
+                            <button
+                              onClick={() => setDocUser(u)}
+                              className="flex items-center gap-1 px-2.5 py-1 border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition"
+                            >
+                              <EyeIcon className="w-3 h-3" /> View ID
+                            </button>
+                          )}
+
+                          {/* Account activate / suspend */}
+                          {u.role !== 'admin' && (
+                            !u.verified ? (
+                              <button
+                                onClick={() => handleAction(u.id, 'approve')}
+                                disabled={!!busy}
+                                className="px-2.5 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50 transition"
+                              >
+                                {busy === u.id + 'approve' ? '…' : 'Activate'}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleAction(u.id, 'suspend')}
+                                disabled={!!busy}
+                                className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200 disabled:opacity-50 transition"
+                              >
+                                {busy === u.id + 'suspend' ? '…' : 'Suspend'}
+                              </button>
+                            )
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

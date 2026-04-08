@@ -31,10 +31,13 @@ export default function ListingForm({ initialData, onSubmit, isSubmitting }) {
     bedrooms: 2,
     bathrooms: 1,
     amenities: [],
-    images: []
+    images: [],
+    lease_url: '',
   });
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [uploadingLease, setUploadingLease] = useState(false);
+  const [leaseUploadError, setLeaseUploadError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -93,12 +96,39 @@ export default function ListingForm({ initialData, onSubmit, isSubmitting }) {
     }));
   };
 
+  const handleLeaseUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLease(true);
+    setLeaseUploadError('');
+    try {
+      const fd = new FormData();
+      fd.append('images', file); // re-use the upload endpoint; it accepts any file
+      const res = await fetch('/api/upload', { method: 'POST', credentials: 'include', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setFormData(prev => ({ ...prev, lease_url: data.urls[0] }));
+    } catch (err) {
+      setLeaseUploadError(err.message || 'Lease upload failed. Please try again.');
+    } finally {
+      setUploadingLease(false);
+      e.target.value = '';
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (onSubmit) await onSubmit(formData);
   };
 
-  const nextStep = () => setStep(s => Math.min(s + 1, 4));
+  const nextStep = () => {
+    // Fix #5: require lease upload before leaving step 3
+    if (step === 3 && !formData.lease_url) {
+      setLeaseUploadError('Please upload the lease agreement before continuing.');
+      return;
+    }
+    setStep(s => Math.min(s + 1, 4));
+  };
   const prevStep = () => setStep(s => Math.max(s - 1, 1));
 
   const stepLabels = [
@@ -345,6 +375,62 @@ export default function ListingForm({ initialData, onSubmit, isSubmitting }) {
                 ))}
               </div>
             </div>
+
+            {/* Fix #5 — Lease Document (required) */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-1">
+                  Lease Agreement <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-slate-400">Upload the lease agreement for this property. This is required before submitting a listing.</p>
+              </div>
+
+              {formData.lease_url ? (
+                <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+                  <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600 text-lg flex-shrink-0">
+                    ✓
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-green-800">Lease uploaded</p>
+                    <a href={formData.lease_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline truncate block">
+                      View uploaded lease
+                    </a>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, lease_url: '' }))}
+                    className="text-xs text-red-500 hover:text-red-700 font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <label className={`block border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer group ${uploadingLease ? 'border-primary/40 bg-primary/5 cursor-wait' : 'border-red-200 bg-red-50 hover:bg-primary/5 hover:border-primary/40'}`}>
+                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-400 mx-auto mb-3 text-2xl">
+                    {uploadingLease ? (
+                      <span className="block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    ) : '📄'}
+                  </div>
+                  <p className="font-semibold text-slate-700 text-sm">
+                    {uploadingLease ? 'Uploading lease...' : 'Click to upload lease agreement'}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">PDF, JPG or PNG — max 10MB</p>
+                  <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={handleLeaseUpload}
+                    disabled={uploadingLease}
+                    className="hidden"
+                  />
+                </label>
+              )}
+
+              {leaseUploadError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                  {leaseUploadError}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
@@ -384,7 +470,13 @@ export default function ListingForm({ initialData, onSubmit, isSubmitting }) {
                 <span className="text-slate-500 font-medium">Photos</span>
                 <span className="text-slate-800">{formData.images.length} uploaded</span>
               </div>
-            </div>
+              <div className="flex justify-between px-5 py-3">
+                <span className="text-slate-500 font-medium">Lease Agreement</span>
+                {formData.lease_url
+                  ? <a href={formData.lease_url} target="_blank" rel="noreferrer" className="text-primary font-semibold underline text-xs">View document ↗</a>
+                  : <span className="text-red-500 font-semibold text-xs">Not uploaded</span>
+                }
+              </div>
 
             {formData.images.length > 0 && (
               <div className="grid grid-cols-4 gap-2">

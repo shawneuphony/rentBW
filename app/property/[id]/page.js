@@ -13,6 +13,8 @@ import {
   CheckCircleIcon,
   ArrowLeftIcon,
   ExclamationTriangleIcon,
+  DocumentTextIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 function safeJson(val, fallback) {
@@ -44,40 +46,61 @@ export default function PropertyPage() {
   const [sending,   setSending]   = useState(false);
   const [msgSent,   setMsgSent]   = useState(false);
 
+  // Apply states
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [applyMessage,   setApplyMessage]   = useState('');
+  const [applying,       setApplying]       = useState(false);
+  const [appliedAlready, setAppliedAlready] = useState(false);
+  const [applyError,     setApplyError]     = useState('');
+
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/properties/${id}`, { credentials: 'include' })
-      .then(async r => {
-        if (!r.ok) throw new Error((await r.json()).error || 'Not found');
-        return r.json();
-      })
-      .then(async ({ property: p }) => {
+    async function loadProperty() {
+      try {
+        const r = await fetch(`/api/properties/${id}`, { credentials: 'include' });
+        if (!r.ok) {
+          const body = await r.json();
+          throw new Error(body.error || 'Not found');
+        }
+        const { property: p } = await r.json();
         const images    = safeJson(p.images, []);
         const amenities = safeJson(p.amenities, []);
         setProperty({ ...p, images, amenities });
 
-        // Record view if active
         if (p.status === 'active') {
           fetch(`/api/properties/${id}/view`, { method: 'POST', credentials: 'include' }).catch(() => {});
         }
 
-        // Fetch landlord info
         if (p.landlord_id) {
           fetch(`/api/users/${p.landlord_id}`, { credentials: 'include' })
-            .then(r => r.ok ? r.json() : null)
+            .then(res => res.ok ? res.json() : null)
             .then(data => { if (data?.user) setLandlord(data.user); })
             .catch(() => {});
         }
 
-        // Fetch similar (same location, active only)
         fetch(`/api/properties?location=${encodeURIComponent(p.location)}&limit=3`, { credentials: 'include' })
-          .then(r => r.ok ? r.json() : { properties: [] })
+          .then(res => res.ok ? res.json() : { properties: [] })
           .then(({ properties }) => setSimilar(properties.filter(x => x.id !== p.id).slice(0, 3)))
           .catch(() => {});
-      })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProperty();
   }, [id]);
+
+  // Check if tenant already applied
+  useEffect(() => {
+    if (!user || user.role !== 'tenant' || !id) return;
+    fetch('/api/tenant/applications', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { applications: [] })
+      .then(({ applications }) => {
+        if (applications.some(a => a.property_id === id)) setAppliedAlready(true);
+      })
+      .catch(() => {});
+  }, [user, id]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -103,6 +126,37 @@ export default function PropertyPage() {
       setMessage('');
     } catch { /* ignore */ }
     setSending(false);
+  };
+
+  const handleApply = async () => {
+    if (!applyMessage.trim()) return;
+    setApplying(true);
+    setApplyError('');
+    try {
+      const res = await fetch('/api/tenant/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ property_id: property.id, notes: applyMessage }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 409) {
+          setAppliedAlready(true);
+          setShowApplyModal(false);
+        } else {
+          throw new Error(data.error || 'Failed to submit application');
+        }
+      } else {
+        setAppliedAlready(true);
+        setShowApplyModal(false);
+        setApplyMessage('');
+      }
+    } catch (err) {
+      setApplyError(err.message);
+    } finally {
+      setApplying(false);
+    }
   };
 
   // ── States ─────────────────────────────────────────────────────────────────
@@ -317,6 +371,32 @@ export default function PropertyPage() {
                       </button>
                     </>
                   )}
+
+                  {/* Apply button — Fix #2 & #3 */}
+                  <div className="pt-2 border-t border-slate-100">
+                    {appliedAlready ? (
+                      <div className="flex items-center gap-2 text-sm text-green-600 font-medium py-2">
+                        <CheckCircleIcon className="w-4 h-4" /> Application submitted!
+                        <Link href="/tenant/applications" className="ml-auto text-primary text-xs underline">View</Link>
+                      </div>
+                    ) : user.id_document_status !== 'approved' ? (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                        <p className="font-bold mb-1">ID Verification Required</p>
+                        <p>Your identification must be approved before you can apply for properties.</p>
+                        <Link href="/tenant/profile" className="text-primary font-bold underline mt-1 block">
+                          Upload your ID →
+                        </Link>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowApplyModal(true)}
+                        className="w-full py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-sm flex items-center justify-center gap-2"
+                      >
+                        <DocumentTextIcon className="w-4 h-4" />
+                        Apply for this Property
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -367,6 +447,54 @@ export default function PropertyPage() {
           </section>
         )}
       </main>
+
+      {/* Apply Modal — Fix #2 */}
+      {showApplyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl max-w-md w-full shadow-2xl">
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold">Apply for this Property</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{property.title}</p>
+              </div>
+              <button onClick={() => { setShowApplyModal(false); setApplyError(''); }} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Message to Landlord <span className="text-red-500">*</span></label>
+                <textarea
+                  value={applyMessage}
+                  onChange={e => setApplyMessage(e.target.value)}
+                  rows={4}
+                  placeholder="Introduce yourself — tell the landlord a little about you, your employment, and why you'd be a great tenant..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                />
+              </div>
+              {applyError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{applyError}</p>
+              )}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => { setShowApplyModal(false); setApplyError(''); }}
+                  className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApply}
+                  disabled={applying || !applyMessage.trim()}
+                  className="flex-1 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50 transition text-sm"
+                >
+                  {applying ? 'Submitting...' : 'Submit Application'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </>
   );

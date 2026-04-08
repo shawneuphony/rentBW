@@ -115,6 +115,12 @@ export async function getDb() {
   if (!colNames.includes('id_document')) await db.run("ALTER TABLE users ADD COLUMN id_document TEXT");
   if (!colNames.includes('id_document_status')) await db.run("ALTER TABLE users ADD COLUMN id_document_status TEXT DEFAULT 'none'");
 
+  // Migrations: properties table
+  const propCols = await db.all("PRAGMA table_info(properties)");
+  const propColNames = propCols.map(c => c.name);
+  if (!propColNames.includes('lease_url')) await db.run("ALTER TABLE properties ADD COLUMN lease_url TEXT DEFAULT ''");
+  if (!propColNames.includes('views')) await db.run("ALTER TABLE properties ADD COLUMN views INTEGER DEFAULT 0");
+
   const userCount = await db.get('SELECT COUNT(*) as count FROM users');
   if (userCount.count === 0) {
     console.log('👥 No users found, creating demo users...');
