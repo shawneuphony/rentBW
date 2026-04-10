@@ -115,6 +115,20 @@ export async function getDb() {
   if (!colNames.includes('id_document')) await db.run("ALTER TABLE users ADD COLUMN id_document TEXT");
   if (!colNames.includes('id_document_status')) await db.run("ALTER TABLE users ADD COLUMN id_document_status TEXT DEFAULT 'none'");
 
+  // Saved reports table
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS saved_reports (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      type TEXT NOT NULL,
+      params TEXT,
+      data TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `);
+
   // Migrations: properties table
   const propCols = await db.all("PRAGMA table_info(properties)");
   const propColNames = propCols.map(c => c.name);
