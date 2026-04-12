@@ -15,7 +15,20 @@ import {
   ExclamationTriangleIcon,
   DocumentTextIcon,
   XMarkIcon,
+  HeartIcon as HeartOutline,
+  ShareIcon,
+  CalendarIcon,
+  WifiIcon,
+  DevicePhoneMobileIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+  CurrencyDollarIcon,
+  ArrowsRightLeftIcon,
+  UserIcon,
+  EnvelopeIcon,
+  PhoneIcon,
 } from '@heroicons/react/24/outline';
+import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
 
 function safeJson(val, fallback) {
   if (Array.isArray(val)) return val;
@@ -45,6 +58,7 @@ export default function PropertyPage() {
   const [message,   setMessage]   = useState('');
   const [sending,   setSending]   = useState(false);
   const [msgSent,   setMsgSent]   = useState(false);
+  const [activeImage, setActiveImage] = useState(0);
 
   // Apply states
   const [showApplyModal, setShowApplyModal] = useState(false);
@@ -104,8 +118,8 @@ export default function PropertyPage() {
 
   const handleSave = async () => {
     if (!user) return;
-    await fetch(`/api/properties/${id}/save`, { method: 'POST', credentials: 'include' });
-    setSaved(s => !s);
+    const res = await fetch(`/api/properties/${id}/save`, { method: 'POST', credentials: 'include' });
+    if (res.ok) setSaved(s => !s);
   };
 
   const handleSendMessage = async () => {
@@ -159,15 +173,13 @@ export default function PropertyPage() {
     }
   };
 
-  // ── States ─────────────────────────────────────────────────────────────────
-
   if (loading) return (
     <>
       <Header />
-      <main className="max-w-5xl mx-auto px-4 py-20 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-        <p className="text-slate-500">Loading property...</p>
-      </main>
+      <div className="rw-loading">
+        <div className="rw-loading__spinner" />
+        <p className="rw-loading__text">Loading property details...</p>
+      </div>
       <Footer />
     </>
   );
@@ -175,13 +187,15 @@ export default function PropertyPage() {
   if (error || !property) return (
     <>
       <Header />
-      <main className="max-w-5xl mx-auto px-4 py-20 text-center">
-        <ExclamationTriangleIcon className="w-12 h-12 text-red-400 mx-auto mb-3" />
-        <p className="text-slate-700 font-medium mb-4">{error || 'Property not found'}</p>
-        <Link href="/" className="inline-flex items-center gap-2 text-primary hover:underline">
-          <ArrowLeftIcon className="w-4 h-4" /> Back to listings
+      <div className="rw-error-page">
+        <div className="rw-error-page__icon">!</div>
+        <h1 className="rw-error-page__title">Property not found</h1>
+        <p className="rw-error-page__desc">{error || 'The property you\'re looking for doesn\'t exist or has been removed.'}</p>
+        <Link href="/" className="rw-error-page__btn">
+          <ArrowLeftIcon className="rw-error-page__btn-icon" />
+          Back to Home
         </Link>
-      </main>
+      </div>
       <Footer />
     </>
   );
@@ -192,13 +206,15 @@ export default function PropertyPage() {
   if (!canView) return (
     <>
       <Header />
-      <main className="max-w-5xl mx-auto px-4 py-20 text-center">
-        <ExclamationTriangleIcon className="w-12 h-12 text-amber-400 mx-auto mb-3" />
-        <p className="text-slate-700 font-medium mb-4">This listing is not publicly available.</p>
-        <Link href="/" className="inline-flex items-center gap-2 text-primary hover:underline">
-          <ArrowLeftIcon className="w-4 h-4" /> Back to listings
+      <div className="rw-error-page">
+        <div className="rw-error-page__icon rw-error-page__icon--warning">🔒</div>
+        <h1 className="rw-error-page__title">Listing Not Available</h1>
+        <p className="rw-error-page__desc">This listing is not publicly available at this time.</p>
+        <Link href="/" className="rw-error-page__btn">
+          <ArrowLeftIcon className="rw-error-page__btn-icon" />
+          Browse Properties
         </Link>
-      </main>
+      </div>
       <Footer />
     </>
   );
@@ -206,296 +222,1291 @@ export default function PropertyPage() {
   return (
     <>
       <Header />
-      <main className="max-w-5xl mx-auto px-4 py-6">
-
-        {/* Back */}
-        <Link href={user?.role === 'admin' ? '/admin/moderation' : '/'} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-primary mb-4 transition-colors">
-          <ArrowLeftIcon className="w-4 h-4" />
-          {user?.role === 'admin' ? 'Back to Moderation' : 'Back to Listings'}
-        </Link>
-
-        {/* Status banner for admin/landlord */}
-        {banner && (user?.role === 'admin' || user?.id === property.landlord_id) && (
-          <div className={`mb-6 p-4 rounded-xl border text-sm font-medium ${banner.bg} ${banner.text}`}>
-            {banner.label}
+      
+      <main className="rw-property-page">
+        <div className="rw-container">
+          
+          {/* Breadcrumb */}
+          <div className="rw-breadcrumb">
+            <Link href="/" className="rw-breadcrumb__link">Home</Link>
+            <span className="rw-breadcrumb__sep">/</span>
+            <Link href="/property/search" className="rw-breadcrumb__link">Properties</Link>
+            <span className="rw-breadcrumb__sep">/</span>
+            <span className="rw-breadcrumb__current">{property.title?.slice(0, 40)}...</span>
           </div>
-        )}
 
-        {/* Admin quick-action bar */}
-        {user?.role === 'admin' && property.status === 'pending' && (
-          <div className="mb-6 p-4 bg-white rounded-xl border border-slate-200 flex items-center gap-3">
-            <span className="text-sm font-medium text-slate-700 mr-auto">Admin actions:</span>
-            <button
-              onClick={async () => {
-                await fetch('/api/admin/properties', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ propertyId: property.id, action: 'approve' }),
-                });
-                setProperty(p => ({ ...p, status: 'active' }));
-              }}
-              className="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 transition"
+          {/* Back to Listings Button */}
+          <div className="rw-back-link">
+            <Link 
+              href={user?.role === 'admin' ? '/admin/moderation' : '/property/search'} 
+              className="rw-back-link__btn"
             >
-              ✓ Approve
-            </button>
-            <button
-              onClick={async () => {
-                await fetch('/api/admin/properties', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ propertyId: property.id, action: 'reject' }),
-                });
-                setProperty(p => ({ ...p, status: 'rejected' }));
-              }}
-              className="px-4 py-2 bg-red-100 text-red-600 text-sm font-bold rounded-lg hover:bg-red-200 transition"
-            >
-              ✕ Reject
-            </button>
+              <ArrowLeftIcon className="rw-back-link__icon" />
+              {user?.role === 'admin' ? 'Back to Moderation' : 'Back to Listings'}
+            </Link>
           </div>
-        )}
 
-        {/* Images */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8 rounded-2xl overflow-hidden">
-          {property.images.length > 0 ? (
-            <>
-              <img src={property.images[0]} alt={property.title} className="w-full h-72 object-cover" />
-              <div className="grid grid-cols-2 gap-3">
-                {property.images.slice(1, 5).map((img, i) => (
-                  <img key={i} src={img} alt="" className="w-full h-[138px] object-cover" />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="col-span-2 h-72 bg-slate-100 flex items-center justify-center rounded-2xl">
-              <HomeIcon className="w-16 h-16 text-slate-300" />
+          {/* Status banner for admin/landlord */}
+          {banner && (user?.role === 'admin' || user?.id === property.landlord_id) && (
+            <div className={`rw-status-banner ${banner.bg}`}>
+              <span className={banner.text}>{banner.label}</span>
             </div>
           )}
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          {/* Main */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Title + Price */}
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-              <div>
-                <h1 className="text-3xl font-black text-slate-900 mb-2">{property.title}</h1>
-                <div className="flex items-center gap-1 text-primary font-medium">
-                  <MapPinIcon className="w-4 h-4" />
-                  {property.location}
-                </div>
-              </div>
-              <div className="bg-primary/10 text-primary px-6 py-3 rounded-xl border border-primary/20 text-right flex-shrink-0">
-                <span className="text-2xl font-black">BWP {property.price?.toLocaleString()}</span>
-                <span className="text-sm font-medium">/month</span>
+          {/* Admin quick-action bar */}
+          {user?.role === 'admin' && property.status === 'pending' && (
+            <div className="rw-admin-bar">
+              <span className="rw-admin-bar__label">Admin actions:</span>
+              <div className="rw-admin-bar__actions">
+                <button
+                  onClick={async () => {
+                    await fetch('/api/admin/properties', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ propertyId: property.id, action: 'approve' }),
+                    });
+                    setProperty(p => ({ ...p, status: 'active' }));
+                  }}
+                  className="rw-admin-bar__btn rw-admin-bar__btn--approve"
+                >
+                  ✓ Approve
+                </button>
+                <button
+                  onClick={async () => {
+                    await fetch('/api/admin/properties', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ propertyId: property.id, action: 'reject' }),
+                    });
+                    setProperty(p => ({ ...p, status: 'rejected' }));
+                  }}
+                  className="rw-admin-bar__btn rw-admin-bar__btn--reject"
+                >
+                  ✕ Reject
+                </button>
               </div>
             </div>
+          )}
 
-            {/* Specs */}
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { label: `${property.beds} Bedrooms` },
-                { label: `${property.baths} Bathrooms` },
-                { label: `${property.sqm || '—'} sqm` },
-              ].map(s => (
-                <div key={s.label} className="p-4 bg-white border border-primary/10 rounded-xl text-center shadow-sm">
-                  <p className="font-bold text-slate-900">{s.label}</p>
+          {/* Gallery Section */}
+          <div className="rw-gallery">
+            <div className="rw-gallery__main">
+              {property.images.length > 0 ? (
+                <img 
+                  src={property.images[activeImage]} 
+                  alt={property.title} 
+                  className="rw-gallery__main-img"
+                />
+              ) : (
+                <div className="rw-gallery__placeholder">
+                  <HomeIcon className="rw-gallery__placeholder-icon" />
                 </div>
-              ))}
+              )}
+              {property.verified && (
+                <div className="rw-gallery__badge">
+                  <ShieldCheckIcon className="rw-gallery__badge-icon" />
+                  <span>Verified Property</span>
+                </div>
+              )}
+              <button onClick={handleSave} className="rw-gallery__save">
+                {saved ? (
+                  <HeartSolid className="rw-gallery__save-icon rw-gallery__save-icon--saved" />
+                ) : (
+                  <HeartOutline className="rw-gallery__save-icon" />
+                )}
+              </button>
             </div>
-
-            {/* Description */}
-            {property.description && (
-              <section>
-                <h3 className="text-xl font-bold mb-3">Description</h3>
-                <p className="text-slate-600 leading-relaxed">{property.description}</p>
-              </section>
-            )}
-
-            {/* Amenities */}
-            {property.amenities.length > 0 && (
-              <section>
-                <h3 className="text-xl font-bold mb-3">Amenities</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {property.amenities.map((a, i) => (
-                    <div key={i} className="flex items-center gap-2 p-3 bg-white rounded-lg border border-primary/10">
-                      <CheckCircleIcon className="w-4 h-4 text-primary flex-shrink-0" />
-                      <span className="text-sm font-medium">{typeof a === 'string' ? a : a.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
+            
+            {property.images.length > 1 && (
+              <div className="rw-gallery__thumbs">
+                {property.images.slice(0, 4).map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveImage(i)}
+                    className={`rw-gallery__thumb ${activeImage === i ? 'rw-gallery__thumb--active' : ''}`}
+                  >
+                    <img src={img} alt={`View ${i + 1}`} />
+                  </button>
+                ))}
+                {property.images.length > 4 && (
+                  <div className="rw-gallery__more">
+                    +{property.images.length - 4} more
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Landlord card */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <h4 className="font-bold mb-4">Listed by</h4>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-                  {getInitials(landlord?.name || 'L')}
-                </div>
+          {/* Content Grid */}
+          <div className="rw-property-grid">
+            
+            {/* Left Column - Main Content */}
+            <div className="rw-property-main">
+              
+              {/* Title & Price */}
+              <div className="rw-property-header">
                 <div>
-                  <p className="font-bold text-slate-900">{landlord?.name || 'Landlord'}</p>
-                  {landlord?.verified && (
-                    <p className="text-xs text-blue-600 flex items-center gap-1">
-                      <CheckCircleIcon className="w-3 h-3" /> Verified
-                    </p>
-                  )}
+                  <h1 className="rw-property-header__title">{property.title}</h1>
+                  <div className="rw-property-header__location">
+                    <MapPinIcon className="rw-property-header__location-icon" />
+                    <span>{property.location}</span>
+                  </div>
+                </div>
+                <div className="rw-property-header__price">
+                  <span className="rw-property-header__price-value">
+                    BWP {property.price?.toLocaleString()}
+                  </span>
+                  <span className="rw-property-header__price-period">/month</span>
                 </div>
               </div>
 
-              {/* Contact / message form */}
-              {user && user.role === 'tenant' && property.status === 'active' && (
-                <div className="space-y-3 mt-4 pt-4 border-t border-slate-100">
-                  {msgSent ? (
-                    <p className="text-sm text-green-600 font-medium text-center py-2">✓ Message sent!</p>
-                  ) : (
-                    <>
-                      <textarea
-                        value={message}
-                        onChange={e => setMessage(e.target.value)}
-                        placeholder="Hi, I'm interested in this property..."
-                        rows={3}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                      />
-                      <button
-                        onClick={handleSendMessage}
-                        disabled={sending || !message.trim()}
-                        className="w-full py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50 transition text-sm"
-                      >
-                        {sending ? 'Sending...' : 'Send Message'}
-                      </button>
-                    </>
-                  )}
+              {/* Key Specs */}
+              <div className="rw-specs">
+                {[
+                  { icon: HomeIcon, label: `${property.beds} ${property.beds === 1 ? 'Bedroom' : 'Bedrooms'}` },
+                  { icon: DevicePhoneMobileIcon, label: `${property.baths} ${property.baths === 1 ? 'Bathroom' : 'Bathrooms'}` },
+                  { icon: ArrowsRightLeftIcon, label: `${property.sqm || '—'} m²` },
+                  { icon: CalendarIcon, label: 'Available Now' },
+                ].map((spec, i) => (
+                  <div key={i} className="rw-spec">
+                    <spec.icon className="rw-spec__icon" />
+                    <span className="rw-spec__label">{spec.label}</span>
+                  </div>
+                ))}
+              </div>
 
-                  {/* Apply button — Fix #2 & #3 */}
-                  <div className="pt-2 border-t border-slate-100">
-                    {appliedAlready ? (
-                      <div className="flex items-center gap-2 text-sm text-green-600 font-medium py-2">
-                        <CheckCircleIcon className="w-4 h-4" /> Application submitted!
-                        <Link href="/tenant/applications" className="ml-auto text-primary text-xs underline">View</Link>
+              {/* Description */}
+              {property.description && (
+                <section className="rw-section">
+                  <h2 className="rw-section__title">Description</h2>
+                  <p className="rw-section__text">{property.description}</p>
+                </section>
+              )}
+
+              {/* Amenities */}
+              {property.amenities.length > 0 && (
+                <section className="rw-section">
+                  <h2 className="rw-section__title">Amenities & Features</h2>
+                  <div className="rw-amenities">
+                    {property.amenities.map((a, i) => (
+                      <div key={i} className="rw-amenity">
+                        <CheckCircleIcon className="rw-amenity__icon" />
+                        <span>{typeof a === 'string' ? a : a.label}</span>
                       </div>
-                    ) : user.id_document_status !== 'approved' ? (
-                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-                        <p className="font-bold mb-1">ID Verification Required</p>
-                        <p>Your identification must be approved before you can apply for properties.</p>
-                        <Link href="/tenant/profile" className="text-primary font-bold underline mt-1 block">
-                          Upload your ID →
-                        </Link>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setShowApplyModal(true)}
-                        className="w-full py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-sm flex items-center justify-center gap-2"
-                      >
-                        <DocumentTextIcon className="w-4 h-4" />
-                        Apply for this Property
-                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            {/* Right Column - Sidebar */}
+            <div className="rw-property-sidebar">
+              
+              {/* Landlord Card */}
+              <div className="rw-card">
+                <h3 className="rw-card__title">Listed by</h3>
+                <div className="rw-landlord">
+                  <div className="rw-landlord__avatar">
+                    {getInitials(landlord?.name || 'L')}
+                  </div>
+                  <div className="rw-landlord__info">
+                    <p className="rw-landlord__name">{landlord?.name || 'Property Owner'}</p>
+                    {landlord?.verified && (
+                      <p className="rw-landlord__verified">
+                        <CheckCircleIcon className="rw-landlord__verified-icon" />
+                        Verified Landlord
+                      </p>
                     )}
                   </div>
                 </div>
-              )}
 
-              {user && property.status === 'active' && (
-                <button
-                  onClick={handleSave}
-                  className={`w-full mt-3 py-2 border rounded-lg text-sm font-medium transition ${
-                    saved ? 'bg-primary/10 text-primary border-primary/20' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {saved ? '✓ Saved' : '♡ Save property'}
-                </button>
-              )}
+                {/* Contact Form */}
+                {user && user.role === 'tenant' && property.status === 'active' && (
+                  <div className="rw-contact-form">
+                    {msgSent ? (
+                      <div className="rw-contact-form__success">
+                        <CheckCircleIcon className="rw-contact-form__success-icon" />
+                        <p>Message sent! The landlord will respond shortly.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <textarea
+                          value={message}
+                          onChange={e => setMessage(e.target.value)}
+                          placeholder="Hi, I'm interested in this property. I'd love to schedule a viewing..."
+                          rows={4}
+                          className="rw-contact-form__textarea"
+                        />
+                        <button
+                          onClick={handleSendMessage}
+                          disabled={sending || !message.trim()}
+                          className="rw-btn rw-btn--primary rw-btn--full"
+                        >
+                          {sending ? 'Sending...' : 'Send Message'}
+                        </button>
+                      </>
+                    )}
 
-              {!user && property.status === 'active' && (
-                <Link href="/auth/login" className="block w-full mt-4 py-2.5 bg-primary text-white font-bold rounded-lg text-center text-sm hover:bg-primary/90 transition">
-                  Login to Contact
-                </Link>
-              )}
+                    {/* Apply Button */}
+                    <div className="rw-apply-section">
+                      {appliedAlready ? (
+                        <div className="rw-apply-success">
+                          <CheckCircleIcon className="rw-apply-success__icon" />
+                          <span>Application submitted!</span>
+                          <Link href="/tenant/applications" className="rw-apply-success__link">
+                            View status →
+                          </Link>
+                        </div>
+                      ) : user?.id_document_status !== 'approved' ? (
+                        <div className="rw-warning">
+                          <ExclamationTriangleIcon className="rw-warning__icon" />
+                          <p className="rw-warning__title">ID Verification Required</p>
+                          <p className="rw-warning__text">Your identification must be approved before you can apply.</p>
+                          <Link href="/tenant/profile" className="rw-warning__link">
+                            Upload your ID →
+                          </Link>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowApplyModal(true)}
+                          className="rw-btn rw-btn--success rw-btn--full"
+                        >
+                          <DocumentTextIcon className="rw-btn__icon" />
+                          Apply for this Property
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {user && property.status === 'active' && (
+                  <button
+                    onClick={handleSave}
+                    className={`rw-btn rw-btn--outline rw-btn--full ${saved ? 'rw-btn--saved' : ''}`}
+                  >
+                    {saved ? '✓ Saved to Favorites' : '♡ Save Property'}
+                  </button>
+                )}
+
+                {!user && property.status === 'active' && (
+                  <Link href="/auth/login" className="rw-btn rw-btn--primary rw-btn--full">
+                    Login to Contact
+                  </Link>
+                )}
+              </div>
+
+              {/* Quick Info Card */}
+              <div className="rw-card">
+                <h3 className="rw-card__title">Quick Info</h3>
+                <div className="rw-quick-info">
+                  <div className="rw-quick-info__item">
+                    <CurrencyDollarIcon className="rw-quick-info__icon" />
+                    <div>
+                      <p className="rw-quick-info__label">Security Deposit</p>
+                      <p className="rw-quick-info__value">BWP {property.price?.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="rw-quick-info__item">
+                    <CalendarIcon className="rw-quick-info__icon" />
+                    <div>
+                      <p className="rw-quick-info__label">Lease Term</p>
+                      <p className="rw-quick-info__value">12 months minimum</p>
+                    </div>
+                  </div>
+                  <div className="rw-quick-info__item">
+                    <WifiIcon className="rw-quick-info__icon" />
+                    <div>
+                      <p className="rw-quick-info__label">Utilities</p>
+                      <p className="rw-quick-info__value">Not included</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Similar */}
-        {similar.length > 0 && (
-          <section className="mt-12">
-            <h3 className="text-xl font-bold mb-4">Similar Properties</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {similar.map(p => {
-                const imgs = safeJson(p.images, []);
-                return (
-                  <Link key={p.id} href={`/property/${p.id}`} className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
-                    <div className="h-40 bg-slate-100">
-                      {imgs[0]
-                        ? <img src={imgs[0]} alt={p.title} className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex items-center justify-center"><HomeIcon className="w-8 h-8 text-slate-300" /></div>
-                      }
-                    </div>
-                    <div className="p-3">
-                      <p className="font-bold text-sm truncate">{p.title}</p>
-                      <p className="text-xs text-slate-500">{p.location}</p>
-                      <p className="text-primary font-bold text-sm mt-1">BWP {p.price?.toLocaleString()}/mo</p>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
+          {/* Similar Properties */}
+          {similar.length > 0 && (
+            <section className="rw-similar">
+              <h2 className="rw-similar__title">Similar Properties</h2>
+              <p className="rw-similar__subtitle">You might also like these listings in {property.location}</p>
+              <div className="rw-similar__grid">
+                {similar.map(p => {
+                  const imgs = safeJson(p.images, []);
+                  return (
+                    <Link key={p.id} href={`/property/${p.id}`} className="rw-similar-card">
+                      <div className="rw-similar-card__image">
+                        {imgs[0] ? (
+                          <img src={imgs[0]} alt={p.title} />
+                        ) : (
+                          <HomeIcon className="rw-similar-card__placeholder" />
+                        )}
+                      </div>
+                      <div className="rw-similar-card__content">
+                        <h3 className="rw-similar-card__title">{p.title}</h3>
+                        <p className="rw-similar-card__location">{p.location}</p>
+                        <p className="rw-similar-card__price">BWP {p.price?.toLocaleString()}/mo</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </div>
       </main>
 
-      {/* Apply Modal — Fix #2 */}
+      {/* Apply Modal */}
       {showApplyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl max-w-md w-full shadow-2xl">
-            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+        <div className="rw-modal">
+          <div className="rw-modal__overlay" onClick={() => setShowApplyModal(false)} />
+          <div className="rw-modal__content">
+            <div className="rw-modal__header">
               <div>
-                <h3 className="text-lg font-bold">Apply for this Property</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{property.title}</p>
+                <h3 className="rw-modal__title">Apply for this Property</h3>
+                <p className="rw-modal__subtitle">{property.title}</p>
               </div>
-              <button onClick={() => { setShowApplyModal(false); setApplyError(''); }} className="p-1.5 hover:bg-slate-100 rounded-lg">
+              <button onClick={() => setShowApplyModal(false)} className="rw-modal__close">
                 <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Message to Landlord <span className="text-red-500">*</span></label>
-                <textarea
-                  value={applyMessage}
-                  onChange={e => setApplyMessage(e.target.value)}
-                  rows={4}
-                  placeholder="Introduce yourself — tell the landlord a little about you, your employment, and why you'd be a great tenant..."
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                />
-              </div>
+            <div className="rw-modal__body">
+              <label className="rw-modal__label">
+                Message to Landlord <span className="rw-modal__required">*</span>
+              </label>
+              <textarea
+                value={applyMessage}
+                onChange={e => setApplyMessage(e.target.value)}
+                rows={5}
+                placeholder="Introduce yourself — tell the landlord about your employment, rental history, and why you'd be a great tenant..."
+                className="rw-modal__textarea"
+              />
               {applyError && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{applyError}</p>
+                <div className="rw-modal__error">
+                  <ExclamationTriangleIcon className="rw-modal__error-icon" />
+                  <span>{applyError}</span>
+                </div>
               )}
-              <div className="flex gap-3 pt-1">
-                <button
-                  onClick={() => { setShowApplyModal(false); setApplyError(''); }}
-                  className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleApply}
-                  disabled={applying || !applyMessage.trim()}
-                  className="flex-1 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50 transition text-sm"
-                >
-                  {applying ? 'Submitting...' : 'Submit Application'}
-                </button>
-              </div>
+            </div>
+            <div className="rw-modal__footer">
+              <button onClick={() => setShowApplyModal(false)} className="rw-modal__cancel">
+                Cancel
+              </button>
+              <button
+                onClick={handleApply}
+                disabled={applying || !applyMessage.trim()}
+                className="rw-modal__submit"
+              >
+                {applying ? 'Submitting...' : 'Submit Application'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       <Footer />
+
+      <style jsx global>{`
+        /* Loading State */
+        .rw-loading {
+          min-height: 60vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: var(--surface);
+        }
+        .rw-loading__spinner {
+          width: 48px;
+          height: 48px;
+          border: 2px solid var(--surface);
+          border-top-color: var(--accent);
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          margin-bottom: 20px;
+        }
+        .rw-loading__text {
+          color: var(--text-muted);
+          font-size: 14px;
+        }
+
+        /* Error Page */
+        .rw-error-page {
+          min-height: 60vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 40px 20px;
+          background: var(--surface);
+        }
+        .rw-error-page__icon {
+          width: 80px;
+          height: 80px;
+          background: #fee2e2;
+          color: #ef4444;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 40px;
+          font-weight: 700;
+          margin-bottom: 24px;
+        }
+        .rw-error-page__icon--warning {
+          background: #fef3c7;
+          color: #f59e0b;
+          font-size: 36px;
+        }
+        .rw-error-page__title {
+          font-family: var(--ff-display);
+          font-size: 28px;
+          font-weight: 700;
+          color: var(--ink);
+          margin-bottom: 12px;
+        }
+        .rw-error-page__desc {
+          color: var(--text-muted);
+          margin-bottom: 32px;
+          max-width: 400px;
+        }
+        .rw-error-page__btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 28px;
+          background: var(--ink);
+          color: var(--white);
+          border-radius: 100px;
+          text-decoration: none;
+          font-size: 14px;
+          font-weight: 600;
+          transition: background 0.2s;
+        }
+        .rw-error-page__btn:hover {
+          background: var(--accent);
+        }
+        .rw-error-page__btn-icon {
+          width: 16px;
+          height: 16px;
+        }
+
+        /* Main Layout */
+        .rw-property-page {
+          background: var(--surface);
+          padding: 32px 0 80px;
+          min-height: 100vh;
+        }
+        .rw-container {
+          max-width: 1280px;
+          margin: 0 auto;
+          padding: 0 40px;
+        }
+        @media (max-width: 768px) {
+          .rw-container {
+            padding: 0 20px;
+          }
+        }
+
+        /* Breadcrumb */
+        .rw-breadcrumb {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          margin-bottom: 16px;
+          flex-wrap: wrap;
+        }
+        .rw-breadcrumb__link {
+          color: var(--text-muted);
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+        .rw-breadcrumb__link:hover {
+          color: var(--accent);
+        }
+        .rw-breadcrumb__sep {
+          color: var(--text-muted);
+        }
+        .rw-breadcrumb__current {
+          color: var(--ink);
+          font-weight: 500;
+        }
+
+        /* Back Link */
+        .rw-back-link {
+          margin-bottom: 24px;
+        }
+        .rw-back-link__btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px;
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          font-size: 13px;
+          font-weight: 500;
+          text-decoration: none;
+          transition: all 0.2s ease;
+          border-radius: 100px;
+        }
+        .rw-back-link__btn:hover {
+          color: var(--accent);
+          gap: 12px;
+          background: rgba(200, 169, 110, 0.1);
+        }
+        .rw-back-link__icon {
+          width: 16px;
+          height: 16px;
+        }
+
+        /* Status Banner */
+        .rw-status-banner {
+          padding: 14px 20px;
+          border-radius: 12px;
+          margin-bottom: 24px;
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        /* Admin Bar */
+        .rw-admin-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 16px;
+          background: var(--white);
+          padding: 16px 24px;
+          border-radius: 16px;
+          margin-bottom: 24px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .rw-admin-bar__label {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--ink);
+        }
+        .rw-admin-bar__actions {
+          display: flex;
+          gap: 12px;
+        }
+        .rw-admin-bar__btn {
+          padding: 8px 20px;
+          border-radius: 100px;
+          font-size: 13px;
+          font-weight: 600;
+          border: none;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .rw-admin-bar__btn--approve {
+          background: #10b981;
+          color: white;
+        }
+        .rw-admin-bar__btn--approve:hover {
+          background: #059669;
+        }
+        .rw-admin-bar__btn--reject {
+          background: #fee2e2;
+          color: #ef4444;
+        }
+        .rw-admin-bar__btn--reject:hover {
+          background: #fecaca;
+        }
+
+        /* Gallery */
+        .rw-gallery {
+          margin-bottom: 48px;
+        }
+        .rw-gallery__main {
+          position: relative;
+          aspect-ratio: 16 / 9;
+          border-radius: 24px;
+          overflow: hidden;
+          background: var(--white);
+          margin-bottom: 12px;
+        }
+        .rw-gallery__main-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .rw-gallery__placeholder {
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(135deg, var(--surface) 0%, #e8e6e0 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .rw-gallery__placeholder-icon {
+          width: 80px;
+          height: 80px;
+          color: var(--text-muted);
+          opacity: 0.3;
+        }
+        .rw-gallery__badge {
+          position: absolute;
+          top: 20px;
+          left: 20px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px;
+          background: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(8px);
+          border-radius: 100px;
+          color: var(--white);
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .rw-gallery__badge-icon {
+          width: 16px;
+          height: 16px;
+        }
+        .rw-gallery__save {
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          width: 44px;
+          height: 44px;
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(4px);
+          border: none;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .rw-gallery__save:hover {
+          transform: scale(1.05);
+        }
+        .rw-gallery__save-icon {
+          width: 22px;
+          height: 22px;
+          color: var(--ink-soft);
+        }
+        .rw-gallery__save-icon--saved {
+          color: #ef4444;
+          fill: #ef4444;
+        }
+        .rw-gallery__thumbs {
+          display: flex;
+          gap: 12px;
+        }
+        .rw-gallery__thumb {
+          width: 100px;
+          height: 70px;
+          border-radius: 12px;
+          overflow: hidden;
+          border: 2px solid transparent;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .rw-gallery__thumb--active {
+          border-color: var(--accent);
+        }
+        .rw-gallery__thumb img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .rw-gallery__more {
+          width: 100px;
+          height: 70px;
+          background: var(--ink);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--white);
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        /* Property Grid */
+        .rw-property-grid {
+          display: grid;
+          grid-template-columns: 1fr 360px;
+          gap: 48px;
+        }
+        @media (max-width: 1024px) {
+          .rw-property-grid {
+            grid-template-columns: 1fr;
+            gap: 32px;
+          }
+        }
+
+        /* Property Header */
+        .rw-property-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 20px;
+          margin-bottom: 32px;
+          padding-bottom: 24px;
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+        }
+        .rw-property-header__title {
+          font-family: var(--ff-display);
+          font-size: 32px;
+          font-weight: 700;
+          color: var(--ink);
+          margin-bottom: 8px;
+        }
+        .rw-property-header__location {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: var(--accent);
+          font-size: 14px;
+        }
+        .rw-property-header__location-icon {
+          width: 16px;
+          height: 16px;
+        }
+        .rw-property-header__price {
+          background: rgba(200, 169, 110, 0.1);
+          padding: 12px 24px;
+          border-radius: 16px;
+          text-align: right;
+        }
+        .rw-property-header__price-value {
+          font-family: var(--ff-display);
+          font-size: 28px;
+          font-weight: 700;
+          color: var(--accent);
+        }
+        .rw-property-header__price-period {
+          font-size: 13px;
+          color: var(--text-muted);
+          margin-left: 4px;
+        }
+
+        /* Specs */
+        .rw-specs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 24px;
+          margin-bottom: 40px;
+        }
+        .rw-spec {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 20px;
+          background: var(--white);
+          border-radius: 100px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .rw-spec__icon {
+          width: 18px;
+          height: 18px;
+          color: var(--accent);
+        }
+        .rw-spec__label {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--ink);
+        }
+
+        /* Sections */
+        .rw-section {
+          margin-bottom: 40px;
+        }
+        .rw-section__title {
+          font-family: var(--ff-display);
+          font-size: 22px;
+          font-weight: 700;
+          color: var(--ink);
+          margin-bottom: 16px;
+        }
+        .rw-section__text {
+          color: var(--text-muted);
+          line-height: 1.7;
+          font-size: 15px;
+        }
+
+        /* Amenities */
+        .rw-amenities {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+        @media (max-width: 640px) {
+          .rw-amenities {
+            grid-template-columns: 1fr;
+          }
+        }
+        .rw-amenity {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 16px;
+          background: var(--white);
+          border-radius: 12px;
+          font-size: 13px;
+          color: var(--ink);
+        }
+        .rw-amenity__icon {
+          width: 16px;
+          height: 16px;
+          color: var(--accent);
+        }
+
+        /* Sidebar Cards */
+        .rw-card {
+          background: var(--white);
+          border-radius: 20px;
+          padding: 24px;
+          margin-bottom: 24px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .rw-card__title {
+          font-size: 16px;
+          font-weight: 600;
+          margin-bottom: 20px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+        }
+
+        /* Landlord */
+        .rw-landlord {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 20px;
+        }
+        .rw-landlord__avatar {
+          width: 56px;
+          height: 56px;
+          background: var(--accent);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 22px;
+          font-weight: 700;
+          color: var(--white);
+        }
+        .rw-landlord__name {
+          font-weight: 600;
+          font-size: 16px;
+          margin-bottom: 4px;
+        }
+        .rw-landlord__verified {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 12px;
+          color: #10b981;
+        }
+        .rw-landlord__verified-icon {
+          width: 14px;
+          height: 14px;
+        }
+
+        /* Contact Form */
+        .rw-contact-form {
+          margin-bottom: 20px;
+        }
+        .rw-contact-form__textarea {
+          width: 100%;
+          padding: 14px;
+          border: 1px solid #e0e0e0;
+          border-radius: 12px;
+          font-size: 13px;
+          resize: vertical;
+          margin-bottom: 12px;
+          font-family: inherit;
+        }
+        .rw-contact-form__textarea:focus {
+          outline: none;
+          border-color: var(--accent);
+        }
+        .rw-contact-form__success {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 16px;
+          background: #ecfdf5;
+          border-radius: 12px;
+          color: #10b981;
+          font-size: 13px;
+          margin-bottom: 16px;
+        }
+        .rw-contact-form__success-icon {
+          width: 20px;
+          height: 20px;
+        }
+
+        /* Apply Section */
+        .rw-apply-section {
+          margin-top: 20px;
+          padding-top: 20px;
+          border-top: 1px solid rgba(0,0,0,0.08);
+        }
+        .rw-apply-success {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          padding: 12px;
+          background: #ecfdf5;
+          border-radius: 12px;
+          font-size: 13px;
+          color: #10b981;
+        }
+        .rw-apply-success__link {
+          margin-left: auto;
+          color: var(--accent);
+          text-decoration: none;
+          font-weight: 500;
+        }
+        .rw-warning {
+          padding: 16px;
+          background: #fef3c7;
+          border-radius: 12px;
+        }
+        .rw-warning__icon {
+          width: 20px;
+          height: 20px;
+          color: #f59e0b;
+          margin-bottom: 8px;
+        }
+        .rw-warning__title {
+          font-weight: 600;
+          font-size: 13px;
+          color: #92400e;
+          margin-bottom: 4px;
+        }
+        .rw-warning__text {
+          font-size: 12px;
+          color: #92400e;
+          margin-bottom: 12px;
+        }
+        .rw-warning__link {
+          font-size: 12px;
+          color: var(--accent);
+          text-decoration: none;
+          font-weight: 500;
+        }
+
+        /* Buttons */
+        .rw-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 12px 24px;
+          border-radius: 100px;
+          font-size: 14px;
+          font-weight: 600;
+          text-decoration: none;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: none;
+        }
+        .rw-btn--full {
+          width: 100%;
+        }
+        .rw-btn--primary {
+          background: var(--ink);
+          color: var(--white);
+        }
+        .rw-btn--primary:hover:not(:disabled) {
+          background: var(--accent);
+        }
+        .rw-btn--success {
+          background: #10b981;
+          color: white;
+        }
+        .rw-btn--success:hover:not(:disabled) {
+          background: #059669;
+        }
+        .rw-btn--outline {
+          background: transparent;
+          border: 1px solid #e0e0e0;
+          color: var(--ink);
+        }
+        .rw-btn--outline:hover {
+          border-color: var(--accent);
+          color: var(--accent);
+        }
+        .rw-btn--saved {
+          background: rgba(200, 169, 110, 0.1);
+          border-color: var(--accent);
+          color: var(--accent);
+        }
+        .rw-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .rw-btn__icon {
+          width: 16px;
+          height: 16px;
+        }
+
+        /* Quick Info */
+        .rw-quick-info {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .rw-quick-info__item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .rw-quick-info__icon {
+          width: 20px;
+          height: 20px;
+          color: var(--accent);
+        }
+        .rw-quick-info__label {
+          font-size: 11px;
+          color: var(--text-muted);
+          margin-bottom: 2px;
+        }
+        .rw-quick-info__value {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--ink);
+        }
+
+        /* Similar Properties */
+        .rw-similar {
+          margin-top: 60px;
+          padding-top: 40px;
+          border-top: 1px solid rgba(0,0,0,0.08);
+        }
+        .rw-similar__title {
+          font-family: var(--ff-display);
+          font-size: 28px;
+          font-weight: 700;
+          color: var(--ink);
+          margin-bottom: 8px;
+        }
+        .rw-similar__subtitle {
+          color: var(--text-muted);
+          margin-bottom: 32px;
+        }
+        .rw-similar__grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 24px;
+        }
+        @media (max-width: 768px) {
+          .rw-similar__grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        .rw-similar-card {
+          background: var(--white);
+          border-radius: 16px;
+          overflow: hidden;
+          text-decoration: none;
+          transition: all 0.3s;
+        }
+        .rw-similar-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+        }
+        .rw-similar-card__image {
+          aspect-ratio: 4/3;
+          overflow: hidden;
+          background: var(--surface);
+        }
+        .rw-similar-card__image img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.4s;
+        }
+        .rw-similar-card:hover .rw-similar-card__image img {
+          transform: scale(1.05);
+        }
+        .rw-similar-card__placeholder {
+          width: 100%;
+          height: 100%;
+          color: var(--text-muted);
+          opacity: 0.3;
+        }
+        .rw-similar-card__content {
+          padding: 16px;
+        }
+        .rw-similar-card__title {
+          font-weight: 600;
+          font-size: 15px;
+          color: var(--ink);
+          margin-bottom: 4px;
+        }
+        .rw-similar-card__location {
+          font-size: 12px;
+          color: var(--text-muted);
+          margin-bottom: 8px;
+        }
+        .rw-similar-card__price {
+          font-weight: 700;
+          color: var(--accent);
+          font-size: 14px;
+        }
+
+        /* Modal */
+        .rw-modal {
+          position: fixed;
+          inset: 0;
+          z-index: 2000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+        .rw-modal__overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+        }
+        .rw-modal__content {
+          position: relative;
+          background: var(--white);
+          border-radius: 24px;
+          max-width: 500px;
+          width: 100%;
+          max-height: 90vh;
+          overflow: auto;
+          animation: modalSlideUp 0.3s ease;
+        }
+        @keyframes modalSlideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .rw-modal__header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding: 24px 24px 16px;
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+        }
+        .rw-modal__title {
+          font-size: 20px;
+          font-weight: 700;
+          color: var(--ink);
+        }
+        .rw-modal__subtitle {
+          font-size: 13px;
+          color: var(--text-muted);
+          margin-top: 4px;
+        }
+        .rw-modal__close {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 8px;
+          border-radius: 50%;
+          transition: background 0.2s;
+        }
+        .rw-modal__close:hover {
+          background: var(--surface);
+        }
+        .rw-modal__body {
+          padding: 24px;
+        }
+        .rw-modal__label {
+          display: block;
+          font-size: 13px;
+          font-weight: 600;
+          margin-bottom: 8px;
+        }
+        .rw-modal__required {
+          color: #ef4444;
+        }
+        .rw-modal__textarea {
+          width: 100%;
+          padding: 14px;
+          border: 1px solid #e0e0e0;
+          border-radius: 12px;
+          font-size: 13px;
+          resize: vertical;
+          font-family: inherit;
+        }
+        .rw-modal__textarea:focus {
+          outline: none;
+          border-color: var(--accent);
+        }
+        .rw-modal__error {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 12px;
+          padding: 12px;
+          background: #fee2e2;
+          border-radius: 12px;
+          font-size: 13px;
+          color: #ef4444;
+        }
+        .rw-modal__error-icon {
+          width: 18px;
+          height: 18px;
+        }
+        .rw-modal__footer {
+          display: flex;
+          gap: 12px;
+          padding: 16px 24px 24px;
+          border-top: 1px solid rgba(0,0,0,0.08);
+        }
+        .rw-modal__cancel {
+          flex: 1;
+          padding: 12px;
+          background: var(--surface);
+          border: none;
+          border-radius: 100px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .rw-modal__cancel:hover {
+          background: #e8e6e0;
+        }
+        .rw-modal__submit {
+          flex: 1;
+          padding: 12px;
+          background: #10b981;
+          color: white;
+          border: none;
+          border-radius: 100px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .rw-modal__submit:hover:not(:disabled) {
+          background: #059669;
+        }
+        .rw-modal__submit:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </>
   );
 }

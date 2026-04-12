@@ -496,6 +496,7 @@ export default function ListingForm({ initialData, onSubmit, isSubmitting }) {
             <p className="text-xs text-slate-400">
               Your listing will be reviewed by our team before going live. You will be notified once it is approved.
             </p>
+            </div>
           </div>
         )}
 
@@ -533,3 +534,4 @@ export default function ListingForm({ initialData, onSubmit, isSubmitting }) {
     </div>
   );
 }
+
