@@ -691,4 +691,4 @@ export default function ApplicationsPage() {
       `}</style>
     </div>
   );
-}
+}   
