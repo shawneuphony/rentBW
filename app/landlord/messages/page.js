@@ -23,13 +23,14 @@ export default function LandlordMessagesPage() {
     await fetchConversation(conv.other_user_id);
   };
 
+  // 🔧 FIX (Bug 8): Add markAsRead to dependency array
   useEffect(() => {
     if (messages.length > 0) {
       messages.forEach(msg => {
         if (msg.receiver_id === user?.id && !msg.read) markAsRead(msg.id);
       });
     }
-  }, [messages, user]);
+  }, [messages, user, markAsRead]);
 
   return (
     <div className="bg-white rounded-2xl border border-border-light overflow-hidden h-[calc(100vh-180px)] flex flex-col md:flex-row">

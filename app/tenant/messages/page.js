@@ -102,7 +102,8 @@ export default function TenantMessagesPage() {
     setSending(true);
     const conv = conversations.find(c => c.otherId === selectedId);
     try {
-      const res = await fetch('/api/tenant/messages', {
+      // 🔧 FIX (Bug 6): Use correct endpoint '/api/messages' instead of '/api/tenant/messages'
+      const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ receiver_id: selectedId, content, property_id: conv?.propertyId ?? null }),

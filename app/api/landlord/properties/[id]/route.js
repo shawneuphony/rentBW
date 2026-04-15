@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/app/lib/utils/db';
 import { getAuthUser } from '@/app/lib/utils/getAuthUser';
+import { randomUUID } from 'crypto';
 
 // GET: property detail + its applications
 export async function GET(request, { params }) {
@@ -108,10 +109,36 @@ export async function PATCH(request, { params }) {
       if (!['approved', 'rejected', 'pending'].includes(body.status)) {
         return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
       }
+
+      // Fetch the application to get tenant_id and current status
+      const app = await db.get(
+        'SELECT tenant_id, status FROM applications WHERE id = ? AND property_id = ?',
+        [body.application_id, id]
+      );
+      if (!app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+
+      // Update the application
       await db.run(
         'UPDATE applications SET status = ?, updated_at = ? WHERE id = ? AND property_id = ?',
         [body.status, Date.now(), body.application_id, id]
       );
+
+      // 🔧 FIX (Bug 5): Send a notification message to the tenant when status changes to approved or rejected
+      if (body.status === 'approved' || body.status === 'rejected') {
+        const propertyInfo = await db.get('SELECT title FROM properties WHERE id = ?', id);
+        const messageContent = body.status === 'approved'
+          ? `Congratulations! Your application for "${propertyInfo.title}" has been approved. The landlord will contact you shortly.`
+          : `Your application for "${propertyInfo.title}" has been rejected. Please keep searching for other properties.`;
+
+        const msgId = randomUUID();
+        const now = Date.now();
+        await db.run(
+          `INSERT INTO messages (id, content, read, sender_id, receiver_id, property_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [msgId, messageContent, 0, user.id, app.tenant_id, id, now]
+        );
+      }
+
       return NextResponse.json({ updated: true });
     }
 

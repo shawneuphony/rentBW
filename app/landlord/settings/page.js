@@ -1,5 +1,5 @@
 import SettingsContent from '@/app/components/ui/SettingsContent';
 
-export default function TenantSettingsPage() {
+export default function LandlordSettingsPage() {
   return <SettingsContent />;
 }

@@ -150,18 +150,20 @@ export default function Header() {
             {user ? (
               <>
                 {/* Messages Icon */}
-                <Link 
-                  href="/messages" 
-                  className="rw-actions__icon"
-                  title="Messages"
-                >
-                  <EnvelopeIcon className="rw-actions__icon-svg" />
-                  {unreadCount > 0 && (
-                    <span className="rw-actions__badge">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </Link>
+                {(user?.role === 'tenant' || user?.role === 'landlord') && (
+                  <Link 
+                    href={`/${user.role}/messages`} 
+                    className="rw-actions__icon"
+                    title="Messages"
+                  >
+                    <EnvelopeIcon className="rw-actions__icon-svg" />
+                    {unreadCount > 0 && (
+                      <span className="rw-actions__badge">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
 
                 {/* Notifications Icon */}
                 <button className="rw-actions__icon">

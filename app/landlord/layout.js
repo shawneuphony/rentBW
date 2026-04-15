@@ -150,6 +150,15 @@ export default function LandlordLayout({ children }) {
       </div>
 
       <style jsx global>{`
+        :root {
+          --surface: #f5f3ef;
+          --ink: #000000;
+          --ink-soft: #000000;
+          --accent: #c8a96e;
+          --text-muted: #6b6b6b;
+          --border-light: rgba(0, 0, 0, 0.08);
+          --ff-display: 'Playfair Display', Georgia, serif;
+        }
         .bg-surface { background: var(--surface); }
         .bg-accent { background: var(--accent); }
         .text-accent { color: var(--accent); }

@@ -21,16 +21,24 @@ import {
 } from '@heroicons/react/24/outline';
 
 function normalise(app) {
+  let firstImage = null;
+  if (app.images) {
+    try {
+      const parsed = JSON.parse(app.images);
+      if (Array.isArray(parsed) && parsed.length > 0) firstImage = parsed[0];
+    } catch (e) {}
+  }
   return {
     ...app,
-    property: app.title ?? 'Unknown Property',
+    property: app.property_title ?? 'Unknown Property',
     location: app.location ?? '',
     landlord: app.landlord_name ?? 'Unknown Landlord',
+    landlordId: app.landlord_id,
     price: app.price ?? 0,
     appliedDate: app.created_at
       ? new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
       : '—',
-    image: Array.isArray(app.images) && app.images.length > 0 ? app.images[0] : null,
+    image: firstImage,
     statusText: getStatusText(app.status),
   };
 }
@@ -295,7 +303,8 @@ export default function ApplicationsPage() {
                         <ChatBubbleLeftIcon className="w-4 h-4" /> Message Landlord
                       </Link>
                     )}
-                    {(app.status === 'pending' || app.status === 'reviewing') && (
+                    {/* 🔧 FIX (Bug 4): Only show withdraw for 'pending' status (not 'reviewing' because backend never sets it) */}
+                    {app.status === 'pending' && (
                       <button
                         onClick={() => handleWithdraw(app.id)}
                         disabled={withdrawing === app.id}

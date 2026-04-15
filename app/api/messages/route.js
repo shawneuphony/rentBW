@@ -97,6 +97,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'content and receiver_id are required' }, { status: 400 });
     }
 
+    // 🔧 FIX (Bug 7): Validate that the receiver exists
+    const receiverExists = await db.get('SELECT id FROM users WHERE id = ?', to);
+    if (!receiverExists) {
+      return NextResponse.json({ error: 'Receiver does not exist' }, { status: 400 });
+    }
+
     const id = randomUUID();
     const now = Date.now();
 
@@ -106,7 +112,20 @@ export async function POST(request) {
       [id, content, user.id, to, propId, parent_id || null, now]
     );
 
-    const message = await db.get('SELECT * FROM messages WHERE id = ?', id);
+    // Fetch the newly created message with sender/receiver names for the response
+    const message = await db.get(
+      `SELECT m.*,
+              s.name as sender_name,
+              r.name as receiver_name,
+              p.title as property_title
+       FROM messages m
+       JOIN users s ON m.sender_id = s.id
+       JOIN users r ON m.receiver_id = r.id
+       LEFT JOIN properties p ON m.property_id = p.id
+       WHERE m.id = ?`,
+      id
+    );
+
     return NextResponse.json({ message }, { status: 201 });
   } catch (err) {
     console.error('Messages POST error:', err);

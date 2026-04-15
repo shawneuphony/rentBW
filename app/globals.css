@@ -26,6 +26,7 @@ body {
   font-family: var(--ff-body);
   background: var(--surface);
   color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4, .heading-font {
@@ -38,6 +39,10 @@ h1, h2, h3, h4, .heading-font {
   color: var(--white);
   border-radius: 100px;
   transition: all 0.2s;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .btn-primary:hover {
   background: var(--accent-dark);
@@ -56,61 +61,29 @@ h1, h2, h3, h4, .heading-font {
   box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.08);
 }
 
-:root {
-  --foreground-rgb: 17, 24, 39; /* #111827 - Primary Text */
-  --background-start-rgb: 249, 250, 251; /* #F9FAFB - Background */
-  --background-end-rgb: 243, 244, 246; /* neutral-100 for gradient */
-}
-
-body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-start-rgb));
-  font-family: 'Inter', system-ui, sans-serif;
-}
-
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #F3F4F6; /* neutral-100 */
+  background: var(--surface);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #0F766E; /* Deep Teal primary */
+  background: var(--accent);
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #115E59; /* Primary Hover */
+  background: var(--accent-dark);
 }
 
 /* Form focus styles */
 input:focus, textarea:focus, select:focus {
-  outline: 2px solid #0F766E;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-color: #0F766E !important;
-}
-
-/* Card styles */
-.card {
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
-  border-radius: 12px;
-}
-
-/* Button base styles */
-.btn-primary {
-  background-color: #0F766E;
-  color: white;
-  border-radius: 10px;
-  min-height: 48px;
-  font-weight: 600;
-}
-
-.btn-primary:hover {
-  background-color: #115E59;
+  border-color: var(--accent) !important;
 }
 
 @keyframes slideIn {
@@ -125,6 +98,6 @@ input:focus, textarea:focus, select:focus {
 }
 
 .animate-slide-in {
-  animation: slideIn 0.3s ease-out;
+  animation: slideIn 0.3s var(--ease-out);
 }
 

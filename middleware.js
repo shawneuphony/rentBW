@@ -1,9 +1,8 @@
 // middleware.js
 import { NextResponse } from 'next/server';
 
-// For development - allow access to all routes
-// Set this to false when you want to enable authentication
-const DEV_MODE = true;
+// Set to false to enable authentication and role-based access control
+const DEV_MODE = false;
 
 // Define public routes that don't require authentication
 const publicRoutes = [
@@ -22,79 +21,30 @@ const publicRoutes = [
   '/api/auth/login',
   '/api/auth/register',
   '/api/properties',
+  '/api/stats',
+  '/api/diagnostic',
+  '/api/health',
+  '/api/ping',
 ];
 
-// All routes are accessible in development mode
-const allRoutes = [
-  '/',
-  '/property',
-  '/property/search',
-  '/property/[id]',
-  '/about',
-  '/contact',
-  '/faq',
-  '/terms',
-  '/privacy',
-  '/auth/login',
-  '/auth/register',
-  '/auth/forgot-password',
-  '/tenant',
-  '/tenant/dashboard',
-  '/tenant/saved',
-  '/tenant/applications',
-  '/tenant/messages',
-  '/tenant/profile',
-  '/tenant/settings',
-  '/landlord',
-  '/landlord/dashboard',
-  '/landlord/listings',
-  '/landlord/listings/new',
-  '/landlord/messages',
-  '/landlord/analytics',
-  '/landlord/profile',
-  '/investor',
-  '/investor/dashboard',
-  '/investor/yield-analysis',
-  '/investor/geospatial',
-  '/investor/market-overview',
-  '/investor/saved-reports',
-  '/investor/settings',
-  '/admin',
-  '/admin/dashboard',
-  '/admin/moderation',
-  '/admin/users',
-  '/admin/data-management',
-  '/admin/reports',
-  '/admin/settings',
-];
+// Helper to decode JWT payload in Edge Runtime
+function decodeJwt(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = parts[1];
+    const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(decodedPayload);
+  } catch (error) {
+    console.error('JWT Decode Error:', error);
+    return null;
+  }
+}
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
   
-  // DEVELOPMENT MODE: Allow access to all routes
-  if (DEV_MODE) {
-    // Check if the route is in our allowed routes
-    const isAllowedRoute = allRoutes.some(route => {
-      if (route.includes('[id]')) {
-        const pattern = route.replace('[id]', '[^/]+');
-        const regex = new RegExp(`^${pattern}$`);
-        return regex.test(pathname);
-      }
-      return pathname === route || pathname.startsWith(route + '/');
-    });
-
-    // If it's an allowed route or starts with /api, allow access
-    if (isAllowedRoute || pathname.startsWith('/api')) {
-      return NextResponse.next();
-    }
-
-    // For any other routes, still allow but log warning
-    console.warn(`[DEV MODE] Accessing unlisted route: ${pathname}`);
-    return NextResponse.next();
-  }
-
-  // PRODUCTION MODE: Normal authentication checks
-  // Check if the route is public
+  // 1. Allow access to public routes
   const isPublicRoute = publicRoutes.some(route => {
     if (route.includes('[id]')) {
       const pattern = route.replace('[id]', '[^/]+');
@@ -104,20 +54,49 @@ export function middleware(request) {
     return pathname === route || pathname.startsWith(route + '/');
   });
 
-  // Allow access to public routes without authentication
   if (isPublicRoute) {
     return NextResponse.next();
   }
 
-  // Check for authentication token
+  // 2. Check for authentication token
   const token = request.cookies.get('token')?.value || 
                 request.headers.get('authorization')?.replace('Bearer ', '');
 
   if (!token) {
-    // Redirect to login if no token
+    // If it's an API route, return 401 instead of redirecting
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // If accessing a protected page without a token, redirect to login
     const loginUrl = new URL('/auth/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // 3. Role-based Access Control
+  const user = decodeJwt(token);
+  
+  if (!user) {
+    // Invalid token structure
+    const loginUrl = new URL('/auth/login', request.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Protect role-specific routes
+  const rolePrefixes = ['/tenant', '/landlord', '/investor', '/admin'];
+  const currentRolePrefix = rolePrefixes.find(prefix => pathname.startsWith(prefix));
+
+  if (currentRolePrefix) {
+    const requiredRole = currentRolePrefix.substring(1); // 'tenant', 'landlord', etc.
+    
+    if (user.role !== requiredRole) {
+      // User is trying to access a route for a different role
+      console.warn(`Unauthorized access attempt: User ${user.email} (role: ${user.role}) tried to access ${pathname}`);
+      
+      // Redirect to their own dashboard
+      return NextResponse.redirect(new URL(`/${user.role}/dashboard`, request.url));
+    }
   }
 
   return NextResponse.next();
