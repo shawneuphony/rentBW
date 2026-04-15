@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/app/lib/hooks/useAuth';
-import { useRouter } from 'next/navigation';  
 import {
   CheckBadgeIcon,
   PencilIcon,
@@ -25,16 +24,7 @@ import {
   ShieldCheckIcon as ShieldSolid,
 } from '@heroicons/react/24/solid';
 
-export default function RedirectProfile() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace('/landlord/profile');
-  }, [router]);
-  return null;
-}
-
 // ── Toast ──────────────────────────────────────────────────────────────────────
-
 function Toast({ toast }) {
   if (!toast.show) return null;
   return (
@@ -52,7 +42,6 @@ function Toast({ toast }) {
 }
 
 // ── ID Document Status Badge ───────────────────────────────────────────────────
-
 function DocStatusBadge({ status }) {
   const map = {
     none:     { label: 'Not uploaded',  cls: 'bg-slate-100 text-slate-500',  Icon: DocumentTextIcon },
@@ -69,7 +58,6 @@ function DocStatusBadge({ status }) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
-
 export default function LandlordProfilePage() {
   const { user, refreshUser } = useAuth();
 

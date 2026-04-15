@@ -1,7 +1,7 @@
 // app/tenant/layout.js
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -12,16 +12,23 @@ import {
   UserIcon,
   Cog6ToothIcon,
   BellIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  Bars3Icon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 export default function TenantLayout({ children }) {
   const pathname = usePathname();
-  const [user] = useState({
-    name: 'Thabo Molefe',
-    role: 'tenant',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA8bexZuKdGTMNfyy-dTOlQEd-yRH8YHQWoArhNORAaGNQ1L1wtWjDdbEx_xybr9rv3XKooz79IHAhApA3GxmBYj5S9UipJHH65lxCsEgJtJ_84dOLL-pE0j4vPLU9MmpZTbfdd0S3on6k02E_xsW3Hmh7Rl0Nou6hZW7riGQm5EvaqJ_Aa3hOuU9RhywuaSmYLcyOALLywZqkh6_sLN1EX2B0b1AYSzigYE73aWU4ES8JlmJ6ux1BrGaIR4IxJJyrb5ClpmWmHjmQ'
-  });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const menuItems = [
     { path: '/tenant/dashboard', label: 'Dashboard', icon: HomeIcon },
@@ -34,70 +41,141 @@ export default function TenantLayout({ children }) {
 
   const isActive = (path) => pathname === path;
 
+  if (!mounted) return null;
+
   return (
-    <div className="min-h-screen bg-background-light">
+    <div className="min-h-screen bg-surface">
       {/* Top Navigation */}
-      <header className="sticky top-0 z-40 bg-white border-b border-primary/10 px-8 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2 text-primary">
-              <div className="size-8 bg-primary rounded-lg flex items-center justify-center text-white">
-                <HomeIcon className="w-5 h-5" />
+      <header className={`sticky top-0 z-40 transition-all duration-300 ${
+        scrolled ? 'bg-white/95 backdrop-blur-sm shadow-sm' : 'bg-white'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
+                <HomeIcon className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold">RentBW</span>
+              <span className="text-xl font-bold text-ink font-display">
+                Rent<span className="text-accent">BW</span>
+              </span>
             </Link>
 
-            <nav className="hidden md:flex items-center gap-6">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  className={`text-sm font-medium transition-colors ${
-                    isActive(item.path)
-                      ? 'text-primary border-b-2 border-primary pb-1'
-                      : 'text-slate-600 hover:text-primary'
-                  }`}
-                >
-                  {item.label}
-                  {item.badge && (
-                    <span className="ml-2 px-1.5 py-0.5 bg-primary/10 text-primary rounded-full text-[10px]">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              ))}
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center gap-1">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      isActive(item.path)
+                        ? 'bg-accent/10 text-accent'
+                        : 'text-ink-soft hover:bg-accent/5 hover:text-accent'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                    {item.badge && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-accent text-white text-[10px] font-bold rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
             </nav>
-          </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative hidden md:block">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search properties..."
-                className="pl-10 pr-4 py-2 bg-slate-100 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 border-none w-64"
-              />
-            </div>
-            
-            <button className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
-              <BellIcon className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
-
-            <Link href="/tenant/profile" className="flex items-center gap-3">
-              <div className="size-10 rounded-full bg-primary/10 overflow-hidden">
-                <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+            {/* Right side */}
+            <div className="flex items-center gap-3">
+              <div className="relative hidden sm:block">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search properties..."
+                  className="pl-10 pr-4 py-2 bg-surface rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-accent w-64"
+                />
               </div>
-              <span className="text-sm font-medium hidden sm:block">{user.name}</span>
-            </Link>
+              <button className="relative p-2 text-ink-soft hover:bg-surface rounded-full transition-colors">
+                <BellIcon className="w-5 h-5" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+              </button>
+
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="md:hidden p-2 text-ink-soft hover:bg-surface rounded-full"
+              >
+                <Bars3Icon className="w-6 h-6" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
+      {/* Mobile Drawer */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
+          <div className="absolute right-0 top-0 bottom-0 w-72 bg-white shadow-xl animate-slide-in">
+            <div className="flex justify-between items-center p-5 border-b border-border-light">
+              <span className="text-xl font-bold font-display">Rent<span className="text-accent">BW</span></span>
+              <button onClick={() => setMobileMenuOpen(false)} className="p-2 hover:bg-surface rounded-full">
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+            <nav className="p-4 flex flex-col gap-1">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                      isActive(item.path)
+                        ? 'bg-accent/10 text-accent'
+                        : 'text-ink-soft hover:bg-surface'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="font-medium">{item.label}</span>
+                    {item.badge && (
+                      <span className="ml-auto px-2 py-0.5 bg-accent text-white text-xs font-bold rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+      )}
+
       {/* Page Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
+      <style jsx global>{`
+        .bg-surface { background: var(--surface); }
+        .bg-accent { background: var(--accent); }
+        .text-accent { color: var(--accent); }
+        .text-ink { color: var(--ink); }
+        .text-ink-soft { color: var(--ink-soft); }
+        .text-text-muted { color: var(--text-muted); }
+        .border-border-light { border-color: var(--border-light); }
+        .font-display { font-family: var(--ff-display); }
+        @keyframes slide-in {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+        .animate-slide-in {
+          animation: slide-in 0.3s var(--ease-out);
+        }
+      `}</style>
     </div>
   );
 }

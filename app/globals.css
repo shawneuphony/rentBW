@@ -1,8 +1,60 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+
+:root {
+  --ink: #0e0e0e;
+  --ink-soft: #2a2a2a;
+  --surface: #f5f3ef;
+  --offwhite: #faf9f6;
+  --white: #ffffff;
+  --accent: #c8a96e;
+  --accent-dark: #a8893e;
+  --text-muted: #6b6b6b;
+  --border-light: rgba(0, 0, 0, 0.08);
+  --ff-display: 'Playfair Display', Georgia, serif;
+  --ff-body: 'DM Sans', sans-serif;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body {
+  font-family: var(--ff-body);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+h1, h2, h3, h4, .heading-font {
+  font-family: var(--ff-display);
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--accent);
+  color: var(--white);
+  border-radius: 100px;
+  transition: all 0.2s;
+}
+.btn-primary:hover {
+  background: var(--accent-dark);
+  transform: translateY(-1px);
+}
+
+/* Cards */
+.card {
+  background: var(--white);
+  border-radius: 20px;
+  border: 1px solid var(--border-light);
+  transition: all 0.3s var(--ease-out);
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.08);
+}
 
 :root {
   --foreground-rgb: 17, 24, 39; /* #111827 - Primary Text */

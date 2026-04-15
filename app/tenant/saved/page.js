@@ -10,10 +10,9 @@ import {
   MagnifyingGlassIcon,
   XMarkIcon,
   ArrowPathIcon,
-  ExclamationCircleIcon,
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
-import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
+import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
 
 function formatSavedDate(ts) {
   if (!ts) return '';
@@ -43,11 +42,6 @@ export default function SavedPropertiesPage() {
   const [sortBy, setSortBy] = useState('newest');
   const [removing, setRemoving] = useState(new Set());
   const [toast, setToast] = useState(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -56,15 +50,13 @@ export default function SavedPropertiesPage() {
 
   const fetchSaved = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch('/api/tenant/saved');
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      if (!res.ok) throw new Error();
       const data = await res.json();
-      const normalised = (data.saved ?? []).map(normalise);
-      setProperties(normalised);
-    } catch (err) {
-      setError(err.message);
+      setProperties((data.saved ?? []).map(normalise));
+    } catch {
+      setError('Failed to load saved properties');
     } finally {
       setLoading(false);
     }
@@ -75,16 +67,16 @@ export default function SavedPropertiesPage() {
   }, [user, fetchSaved]);
 
   const handleRemove = async (propertyId) => {
-    setRemoving((prev) => new Set(prev).add(propertyId));
+    setRemoving(prev => new Set(prev).add(propertyId));
     try {
       const res = await fetch(`/api/properties/${propertyId}/save`, { method: 'POST' });
       if (!res.ok) throw new Error();
-      setProperties((prev) => prev.filter((p) => p.id !== propertyId));
-      showToast('Property removed from saved');
+      setProperties(prev => prev.filter(p => p.id !== propertyId));
+      showToast('Property removed');
     } catch {
       showToast('Error removing property', 'error');
     } finally {
-      setRemoving((prev) => {
+      setRemoving(prev => {
         const s = new Set(prev);
         s.delete(propertyId);
         return s;
@@ -92,7 +84,7 @@ export default function SavedPropertiesPage() {
     }
   };
 
-  const filtered = properties.filter((p) =>
+  const filtered = properties.filter(p =>
     !searchTerm ||
     p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.location?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -106,407 +98,111 @@ export default function SavedPropertiesPage() {
     return 0;
   });
 
-  if (!mounted) return null;
-
   if (loading) {
     return (
-      <div className="rw-page-loading">
-        <div className="rw-page-loading__spinner" />
-        <p className="rw-page-loading__text">Loading your saved properties...</p>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error && properties.length === 0) {
     return (
-      <div className="rw-page-error">
-        <ExclamationCircleIcon className="rw-page-error__icon" />
-        <h3 className="rw-page-error__title">Failed to load saved properties</h3>
-        <p className="rw-page-error__text">{error}</p>
-        <button onClick={fetchSaved} className="rw-page-error__btn">
-          Try again
-        </button>
+      <div className="text-center py-16">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-2xl">!</span>
+        </div>
+        <h3 className="text-xl font-bold mb-2">Failed to load saved properties</h3>
+        <p className="text-text-muted mb-4">{error}</p>
+        <button onClick={fetchSaved} className="btn-primary px-6 py-2">Try again</button>
       </div>
     );
   }
 
   return (
-    <div className="rw-saved-page">
-      {/* Toast */}
-      {toast && (
-        <div className={`rw-toast rw-toast--${toast.type}`}>
-          <span>{toast.message}</span>
-        </div>
-      )}
-
+    <div>
       {/* Header */}
-      <div className="rw-page-header">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="rw-page-header__title">Saved Properties</h1>
-          <p className="rw-page-header__subtitle">
-            {properties.length} {properties.length === 1 ? 'property' : 'properties'} saved
-          </p>
+          <h1 className="text-3xl font-bold font-display">Saved Properties</h1>
+          <p className="text-text-muted mt-1">{properties.length} saved {properties.length === 1 ? 'property' : 'properties'}</p>
         </div>
-        <button onClick={fetchSaved} className="rw-page-header__refresh" title="Refresh">
-          <ArrowPathIcon className="rw-page-header__refresh-icon" />
+        <button onClick={fetchSaved} className="p-2 hover:bg-surface rounded-full transition-colors" title="Refresh">
+          <ArrowPathIcon className="w-5 h-5 text-text-muted" />
         </button>
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="rw-search-bar">
-        <div className="rw-search-bar__input-wrapper">
-          <MagnifyingGlassIcon className="rw-search-bar__icon" />
+      {/* Search & Sort */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="relative flex-1">
+          <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search saved properties..."
-            className="rw-search-bar__input"
+            className="w-full pl-12 pr-4 py-3 bg-white border border-border-light rounded-full focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="rw-search-bar__select"
+          onChange={e => setSortBy(e.target.value)}
+          className="px-5 py-3 bg-white border border-border-light rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-accent"
         >
-          <option value="newest">Newest Saved</option>
-          <option value="oldest">Oldest Saved</option>
+          <option value="newest">Newest saved</option>
+          <option value="oldest">Oldest saved</option>
           <option value="price-high">Price: High to Low</option>
           <option value="price-low">Price: Low to High</option>
         </select>
       </div>
 
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-2 rounded-full text-sm font-medium ${
+          toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          {toast.message}
+        </div>
+      )}
+
       {/* Results */}
       {sorted.length > 0 ? (
-        <div className="rw-saved-grid">
-          {sorted.map((property) => (
-            <div key={property.id} className="rw-saved-card">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {sorted.map(property => (
+            <div key={property.id} className="relative group">
               <PropertyCard property={property} />
               <button
                 onClick={() => handleRemove(property.id)}
                 disabled={removing.has(property.id)}
-                className="rw-saved-card__remove"
+                className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 bg-black/70 backdrop-blur rounded-full text-white text-xs font-medium hover:bg-red-600 transition-colors"
               >
                 {removing.has(property.id) ? (
-                  <ArrowPathIcon className="rw-saved-card__remove-icon animate-spin" />
+                  <ArrowPathIcon className="w-3 h-3 animate-spin" />
                 ) : (
-                  <XMarkIcon className="rw-saved-card__remove-icon" />
+                  <XMarkIcon className="w-3 h-3" />
                 )}
-                <span>Remove</span>
+                Remove
               </button>
             </div>
           ))}
         </div>
       ) : properties.length === 0 ? (
-        <div className="rw-empty-hero">
-          <HeartIconSolid className="rw-empty-hero__icon" />
-          <h2 className="rw-empty-hero__title">No saved properties yet</h2>
-          <p className="rw-empty-hero__text">
-            Start exploring properties and save the ones you love.
-          </p>
-          <Link href="/property/search" className="rw-empty-hero__btn">
-            Browse Properties
-            <ArrowRightIcon className="rw-empty-hero__btn-icon" />
+        <div className="text-center py-16 bg-white rounded-2xl border border-border-light">
+          <HeartSolid className="w-16 h-16 text-text-muted/30 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold font-display mb-2">No saved properties yet</h2>
+          <p className="text-text-muted mb-6">Start exploring properties and save the ones you love.</p>
+          <Link href="/property/search" className="btn-primary inline-flex items-center gap-2 px-6 py-3">
+            Browse Properties <ArrowRightIcon className="w-4 h-4" />
           </Link>
         </div>
       ) : (
-        <div className="rw-empty-state">
-          <MagnifyingGlassIcon className="rw-empty-state__icon" />
-          <p className="rw-empty-state__title">No matching properties</p>
-          <p className="rw-empty-state__text">Try adjusting your search term.</p>
-          <button onClick={() => setSearchTerm('')} className="rw-empty-state__btn">
-            Clear search
-          </button>
+        <div className="text-center py-16 bg-white rounded-2xl border border-border-light">
+          <MagnifyingGlassIcon className="w-16 h-16 text-text-muted/30 mx-auto mb-4" />
+          <h3 className="text-xl font-bold mb-2">No matching properties</h3>
+          <p className="text-text-muted">Try adjusting your search term.</p>
+          <button onClick={() => setSearchTerm('')} className="text-accent mt-4 underline">Clear search</button>
         </div>
       )}
-
-      <style jsx global>{`
-        .rw-saved-page {
-          min-height: 100vh;
-          background: var(--surface);
-          padding: 32px 40px;
-        }
-        @media (max-width: 768px) {
-          .rw-saved-page {
-            padding: 20px;
-          }
-        }
-
-        .rw-page-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 32px;
-        }
-        .rw-page-header__title {
-          font-family: var(--ff-display);
-          font-size: 32px;
-          font-weight: 700;
-          color: var(--ink);
-          margin-bottom: 4px;
-        }
-        .rw-page-header__subtitle {
-          color: var(--text-muted);
-          font-size: 14px;
-        }
-        .rw-page-header__refresh {
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 10px;
-          border-radius: 50%;
-          transition: background 0.2s;
-        }
-        .rw-page-header__refresh:hover {
-          background: rgba(0, 0, 0, 0.05);
-        }
-        .rw-page-header__refresh-icon {
-          width: 20px;
-          height: 20px;
-          color: var(--text-muted);
-        }
-
-        .rw-search-bar {
-          display: flex;
-          gap: 16px;
-          margin-bottom: 32px;
-          flex-wrap: wrap;
-        }
-        .rw-search-bar__input-wrapper {
-          flex: 1;
-          position: relative;
-        }
-        .rw-search-bar__icon {
-          position: absolute;
-          left: 16px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 18px;
-          height: 18px;
-          color: var(--text-muted);
-        }
-        .rw-search-bar__input {
-          width: 100%;
-          padding: 14px 16px 14px 46px;
-          border: 1px solid #e0e0e0;
-          border-radius: 16px;
-          font-size: 14px;
-          background: var(--white);
-          transition: all 0.2s;
-        }
-        .rw-search-bar__input:focus {
-          outline: none;
-          border-color: var(--accent);
-          box-shadow: 0 0 0 3px rgba(200, 169, 110, 0.1);
-        }
-        .rw-search-bar__select {
-          padding: 14px 20px;
-          border: 1px solid #e0e0e0;
-          border-radius: 16px;
-          font-size: 14px;
-          background: var(--white);
-          cursor: pointer;
-        }
-
-        .rw-saved-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 24px;
-        }
-        @media (max-width: 1024px) {
-          .rw-saved-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-        @media (max-width: 640px) {
-          .rw-saved-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        .rw-saved-card {
-          position: relative;
-        }
-        .rw-saved-card__remove {
-          position: absolute;
-          bottom: 16px;
-          right: 16px;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 8px 16px;
-          background: rgba(0, 0, 0, 0.7);
-          backdrop-filter: blur(4px);
-          border: none;
-          border-radius: 100px;
-          color: white;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-          z-index: 10;
-        }
-        .rw-saved-card__remove:hover {
-          background: #ef4444;
-        }
-        .rw-saved-card__remove-icon {
-          width: 14px;
-          height: 14px;
-        }
-
-        .rw-empty-hero {
-          text-align: center;
-          padding: 80px 20px;
-          background: var(--white);
-          border-radius: 32px;
-        }
-        .rw-empty-hero__icon {
-          width: 64px;
-          height: 64px;
-          color: var(--text-muted);
-          opacity: 0.5;
-          margin-bottom: 24px;
-        }
-        .rw-empty-hero__title {
-          font-family: var(--ff-display);
-          font-size: 24px;
-          font-weight: 700;
-          margin-bottom: 8px;
-        }
-        .rw-empty-hero__text {
-          color: var(--text-muted);
-          margin-bottom: 32px;
-        }
-        .rw-empty-hero__btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 14px 32px;
-          background: var(--accent);
-          color: var(--white);
-          border-radius: 100px;
-          text-decoration: none;
-          font-weight: 600;
-          transition: all 0.2s;
-        }
-        .rw-empty-hero__btn:hover {
-          background: var(--accent-dark);
-          gap: 12px;
-        }
-        .rw-empty-hero__btn-icon {
-          width: 16px;
-          height: 16px;
-        }
-
-        .rw-toast {
-          position: fixed;
-          bottom: 24px;
-          right: 24px;
-          padding: 12px 24px;
-          border-radius: 100px;
-          font-size: 14px;
-          font-weight: 500;
-          z-index: 1000;
-          animation: slideIn 0.3s ease;
-        }
-        .rw-toast--success {
-          background: #10b981;
-          color: white;
-        }
-        .rw-toast--error {
-          background: #ef4444;
-          color: white;
-        }
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateX(100%);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
-        .rw-page-loading {
-          min-height: 60vh;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-        }
-        .rw-page-loading__spinner {
-          width: 48px;
-          height: 48px;
-          border: 2px solid var(--surface);
-          border-top-color: var(--accent);
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-          margin-bottom: 16px;
-        }
-        .rw-page-loading__text {
-          color: var(--text-muted);
-        }
-
-        .rw-page-error {
-          text-align: center;
-          padding: 60px 20px;
-        }
-        .rw-page-error__icon {
-          width: 48px;
-          height: 48px;
-          color: #ef4444;
-          margin: 0 auto 16px;
-        }
-        .rw-page-error__title {
-          font-size: 18px;
-          font-weight: 600;
-          margin-bottom: 8px;
-        }
-        .rw-page-error__text {
-          color: var(--text-muted);
-          margin-bottom: 24px;
-        }
-        .rw-page-error__btn {
-          padding: 10px 24px;
-          background: var(--ink);
-          color: var(--white);
-          border: none;
-          border-radius: 100px;
-          cursor: pointer;
-        }
-
-        .rw-empty-state {
-          text-align: center;
-          padding: 60px 20px;
-          background: var(--white);
-          border-radius: 24px;
-        }
-        .rw-empty-state__icon {
-          width: 48px;
-          height: 48px;
-          color: var(--text-muted);
-          margin-bottom: 16px;
-        }
-        .rw-empty-state__title {
-          font-weight: 600;
-          margin-bottom: 4px;
-        }
-        .rw-empty-state__text {
-          color: var(--text-muted);
-          font-size: 13px;
-          margin-bottom: 20px;
-        }
-        .rw-empty-state__btn {
-          padding: 10px 24px;
-          background: var(--ink);
-          color: var(--white);
-          border: none;
-          border-radius: 100px;
-          cursor: pointer;
-          font-size: 13px;
-        }
-      `}</style>
     </div>
   );
 }
