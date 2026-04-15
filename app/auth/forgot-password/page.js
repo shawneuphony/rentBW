@@ -1,4 +1,3 @@
-// app/auth/forgot-password/page.js
 'use client';
 
 import { useState } from 'react';
@@ -20,11 +19,20 @@ export default function ForgotPasswordPage() {
     setError('');
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
       setIsSubmitted(true);
-    }, 1500);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

@@ -1,20 +1,11 @@
-// app/api/admin/stats/route.js
 import { NextResponse } from 'next/server';
 import { getDb } from '@/app/lib/utils/db';
-import { verifyToken } from '@/app/lib/utils/auth';
-
-function getAuthUser(request) {
-  const token =
-    request.cookies.get('token')?.value ||
-    request.headers.get('authorization')?.replace('Bearer ', '');
-  if (!token) return null;
-  return verifyToken(token);
-}
+import { getAuthUser } from '@/app/lib/utils/getAuthUser';
 
 export async function GET(request) {
   try {
-    const user = getAuthUser(request);
-    if (!user)              return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const user = await getAuthUser(request);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const db = await getDb();
@@ -47,32 +38,14 @@ export async function GET(request) {
       db.get('SELECT COUNT(*) as count FROM messages WHERE read = 0'),
       db.get('SELECT COUNT(*) as count FROM messages'),
       db.get('SELECT COUNT(*) as count FROM users WHERE verified = 0'),
-
-      // 5 most recent users
-      db.all(
-        `SELECT id, name, email, role, verified, created_at
-         FROM users ORDER BY created_at DESC LIMIT 5`
-      ),
-
-      // 5 most recent properties
-      db.all(
-        `SELECT p.id, p.title, p.price, p.location, p.status, p.created_at,
-                u.name AS landlord_name
-         FROM properties p
-         LEFT JOIN users u ON p.landlord_id = u.id
-         ORDER BY p.created_at DESC LIMIT 5`
-      ),
+      db.all(`SELECT id, name, email, role, verified, created_at FROM users ORDER BY created_at DESC LIMIT 5`),
+      db.all(`SELECT p.id, p.title, p.price, p.location, p.status, p.created_at, u.name AS landlord_name FROM properties p LEFT JOIN users u ON p.landlord_id = u.id ORDER BY p.created_at DESC LIMIT 5`),
     ]);
 
-    // Weekly signups for the last 4 weeks (for the chart)
     const fourWeeksAgo = Date.now() - 28 * 24 * 60 * 60 * 1000;
-    const weeklySignups = await db.all(
-      `SELECT created_at FROM users WHERE created_at >= ? ORDER BY created_at ASC`,
-      fourWeeksAgo
-    );
-
+    const weeklySignups = await db.all(`SELECT created_at FROM users WHERE created_at >= ? ORDER BY created_at ASC`, fourWeeksAgo);
     const weeks = [0, 0, 0, 0];
-    const now   = Date.now();
+    const now = Date.now();
     for (const row of weeklySignups) {
       const daysAgo = Math.floor((now - row.created_at) / (24 * 60 * 60 * 1000));
       const weekIdx = Math.min(3, Math.floor(daysAgo / 7));
@@ -81,17 +54,17 @@ export async function GET(request) {
 
     return NextResponse.json({
       stats: {
-        totalUsers:          totalUsers?.count          ?? 0,
-        tenants:             tenants?.count             ?? 0,
-        landlords:           landlords?.count           ?? 0,
-        investors:           investors?.count           ?? 0,
-        activeListings:      activeListings?.count      ?? 0,
-        pendingListings:     pendingListings?.count     ?? 0,
-        totalApplications:   totalApplications?.count   ?? 0,
+        totalUsers: totalUsers?.count ?? 0,
+        tenants: tenants?.count ?? 0,
+        landlords: landlords?.count ?? 0,
+        investors: investors?.count ?? 0,
+        activeListings: activeListings?.count ?? 0,
+        pendingListings: pendingListings?.count ?? 0,
+        totalApplications: totalApplications?.count ?? 0,
         pendingApplications: pendingApplications?.count ?? 0,
-        approvedApplications:approvedApplications?.count?? 0,
-        unreadMessages:      unreadMessages?.count      ?? 0,
-        totalMessages:       totalMessages?.count       ?? 0,
+        approvedApplications: approvedApplications?.count ?? 0,
+        unreadMessages: unreadMessages?.count ?? 0,
+        totalMessages: totalMessages?.count ?? 0,
         pendingVerification: pendingVerification?.count ?? 0,
       },
       weeklySignups: [

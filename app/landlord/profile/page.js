@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/app/lib/hooks/useAuth';
+import { useRouter } from 'next/navigation';  
 import {
   CheckBadgeIcon,
   PencilIcon,
@@ -23,6 +24,14 @@ import {
   CheckCircleIcon as CheckCircleSolid,
   ShieldCheckIcon as ShieldSolid,
 } from '@heroicons/react/24/solid';
+
+export default function RedirectProfile() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/landlord/profile');
+  }, [router]);
+  return null;
+}
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
 

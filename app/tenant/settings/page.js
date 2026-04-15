@@ -1,49 +1,71 @@
-// app/tenant/settings/page.js
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/app/lib/hooks/useAuth';
 import {
   BellIcon,
   EnvelopeIcon,
   DevicePhoneMobileIcon,
   LockClosedIcon,
-  LanguageIcon,
-  MoonIcon,
-  GlobeAltIcon
+  GlobeAltIcon,
+  MoonIcon
 } from '@heroicons/react/24/outline';
 
 export default function TenantSettingsPage() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
-    notifications: {
-      email: true,
-      push: true,
-      sms: false,
-      marketing: false
-    },
-    privacy: {
-      showProfile: true,
-      showApplications: false
-    },
+    notifications: { email: true, push: true, sms: false, marketing: false },
+    privacy: { showProfile: true, showApplications: false },
     language: 'English',
     theme: 'light'
   });
 
-  const handleNotificationChange = (key) => {
-    setSettings({
-      ...settings,
-      notifications: {
-        ...settings.notifications,
-        [key]: !settings.notifications[key]
-      }
-    });
+  useEffect(() => {
+    if (user) {
+      fetch('/api/user/settings')
+        .then(res => res.json())
+        .then(data => setSettings(prev => ({ ...prev, ...data })))
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }
+  }, [user]);
+
+  const updateSetting = async (path, value) => {
+    const newSettings = { ...settings };
+    if (path.includes('.')) {
+      const [parent, child] = path.split('.');
+      newSettings[parent][child] = value;
+    } else {
+      newSettings[path] = value;
+    }
+    setSettings(newSettings);
+    setSaving(true);
+    try {
+      await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings),
+      });
+    } catch (err) {
+      console.error('Failed to save setting:', err);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" /></div>;
+  }
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
+      {saving && <div className="text-xs text-primary text-right">Saving...</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Settings Navigation */}
+        {/* Navigation */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl border border-slate-200 p-4 sticky top-24">
             <nav className="space-y-1">
@@ -51,15 +73,15 @@ export default function TenantSettingsPage() {
                 <BellIcon className="w-5 h-5" />
                 <span className="text-sm font-bold">Notifications</span>
               </a>
-              <a href="#privacy" className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+              <a href="#privacy" className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-lg">
                 <LockClosedIcon className="w-5 h-5" />
                 <span className="text-sm font-medium">Privacy</span>
               </a>
-              <a href="#language" className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+              <a href="#language" className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-lg">
                 <GlobeAltIcon className="w-5 h-5" />
                 <span className="text-sm font-medium">Language & Region</span>
               </a>
-              <a href="#theme" className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+              <a href="#theme" className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-lg">
                 <MoonIcon className="w-5 h-5" />
                 <span className="text-sm font-medium">Appearance</span>
               </a>
@@ -67,123 +89,72 @@ export default function TenantSettingsPage() {
           </div>
         </div>
 
-        {/* Settings Content */}
+        {/* Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Notifications Section */}
+          {/* Notifications */}
           <section id="notifications" className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-bold mb-6">Notification Preferences</h2>
-            
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <EnvelopeIcon className="w-5 h-5 text-slate-400" />
-                  <div>
-                    <p className="font-medium">Email Notifications</p>
-                    <p className="text-xs text-slate-500">Receive updates about your applications and messages</p>
+              {[
+                { key: 'email', icon: EnvelopeIcon, label: 'Email Notifications', desc: 'Receive updates about your applications and messages' },
+                { key: 'push', icon: BellIcon, label: 'Push Notifications', desc: 'Browser and mobile push notifications' },
+                { key: 'sms', icon: DevicePhoneMobileIcon, label: 'SMS Alerts', desc: 'Important updates via text message' }
+              ].map(({ key, icon: Icon, label, desc }) => (
+                <div key={key} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Icon className="w-5 h-5 text-slate-400" />
+                    <div>
+                      <p className="font-medium">{label}</p>
+                      <p className="text-xs text-slate-500">{desc}</p>
+                    </div>
                   </div>
-                </div>
-                <button
-                  onClick={() => handleNotificationChange('email')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    settings.notifications.email ? 'bg-primary' : 'bg-slate-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      settings.notifications.email ? 'translate-x-6' : 'translate-x-1'
+                  <button
+                    onClick={() => updateSetting(`notifications.${key}`, !settings.notifications[key])}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settings.notifications[key] ? 'bg-primary' : 'bg-slate-200'
                     }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <BellIcon className="w-5 h-5 text-slate-400" />
-                  <div>
-                    <p className="font-medium">Push Notifications</p>
-                    <p className="text-xs text-slate-500">Browser and mobile push notifications</p>
-                  </div>
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.notifications[key] ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleNotificationChange('push')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    settings.notifications.push ? 'bg-primary' : 'bg-slate-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      settings.notifications.push ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <DevicePhoneMobileIcon className="w-5 h-5 text-slate-400" />
-                  <div>
-                    <p className="font-medium">SMS Alerts</p>
-                    <p className="text-xs text-slate-500">Important updates via text message</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleNotificationChange('sms')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    settings.notifications.sms ? 'bg-primary' : 'bg-slate-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      settings.notifications.sms ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
+              ))}
             </div>
           </section>
 
-          {/* Privacy Section */}
+          {/* Privacy */}
           <section id="privacy" className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-bold mb-6">Privacy Settings</h2>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Profile Visibility</p>
-                  <p className="text-xs text-slate-500">Allow landlords to see your profile when you apply</p>
-                </div>
-                <button
-                  onClick={() => setSettings({
-                    ...settings,
-                    privacy: { ...settings.privacy, showProfile: !settings.privacy.showProfile }
-                  })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    settings.privacy.showProfile ? 'bg-primary' : 'bg-slate-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      settings.privacy.showProfile ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Profile Visibility</p>
+                <p className="text-xs text-slate-500">Allow landlords to see your profile when you apply</p>
               </div>
+              <button
+                onClick={() => updateSetting('privacy.showProfile', !settings.privacy.showProfile)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  settings.privacy.showProfile ? 'bg-primary' : 'bg-slate-200'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.privacy.showProfile ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
             </div>
           </section>
 
-          {/* Language Section */}
+          {/* Language */}
           <section id="language" className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-bold mb-6">Language & Region</h2>
-            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Language</label>
-                <select className="w-full md:w-64 px-4 py-2 border border-slate-200 rounded-lg focus:ring-primary focus:border-primary">
+                <select
+                  value={settings.language}
+                  onChange={(e) => updateSetting('language', e.target.value)}
+                  className="w-full md:w-64 px-4 py-2 border border-slate-200 rounded-lg focus:ring-primary focus:border-primary"
+                >
                   <option>English</option>
                   <option>Setswana</option>
                 </select>
               </div>
-              
               <div>
                 <label className="block text-sm font-medium mb-2">Currency</label>
                 <select className="w-full md:w-64 px-4 py-2 border border-slate-200 rounded-lg focus:ring-primary focus:border-primary">
@@ -195,41 +166,24 @@ export default function TenantSettingsPage() {
             </div>
           </section>
 
-          {/* Theme Section */}
+          {/* Theme */}
           <section id="theme" className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-lg font-bold mb-6">Appearance</h2>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Dark Mode</p>
-                  <p className="text-xs text-slate-500">Switch between light and dark theme</p>
-                </div>
-                <button
-                  onClick={() => setSettings({
-                    ...settings,
-                    theme: settings.theme === 'light' ? 'dark' : 'light'
-                  })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    settings.theme === 'dark' ? 'bg-primary' : 'bg-slate-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      settings.theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Dark Mode</p>
+                <p className="text-xs text-slate-500">Switch between light and dark theme</p>
               </div>
+              <button
+                onClick={() => updateSetting('theme', settings.theme === 'light' ? 'dark' : 'light')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  settings.theme === 'dark' ? 'bg-primary' : 'bg-slate-200'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.theme === 'dark' ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
             </div>
           </section>
-
-          {/* Save Button */}
-          <div className="flex justify-end">
-            <button className="px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all">
-              Save Changes
-            </button>
-          </div>
         </div>
       </div>
     </div>
