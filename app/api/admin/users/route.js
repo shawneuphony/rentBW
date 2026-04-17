@@ -1,20 +1,17 @@
 // app/api/admin/users/route.js
 import { NextResponse } from 'next/server';
 import { getDb } from '@/app/lib/utils/db';
-import { verifyToken } from '@/app/lib/utils/auth';
-
-function getAuthUser(request) {
-  const token =
-    request.cookies.get('token')?.value ||
-    request.headers.get('authorization')?.replace('Bearer ', '');
-  if (!token) return null;
-  return verifyToken(token);
-}
+// FIX 5: The original file declared a local getAuthUser() that called only
+// verifyToken() — it trusted role claims from the JWT without re-fetching from
+// the DB. A user whose role was changed would retain admin access until their
+// token expired (up to 7 days). Replaced with the shared getAuthUser helper,
+// which re-fetches the live row from the DB on every request.
+import { getAuthUser } from '@/app/lib/utils/getAuthUser';
 
 // GET — list all users with optional filters
 export async function GET(request) {
   try {
-    const user = getAuthUser(request);
+    const user = await getAuthUser(request);
     if (!user)                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' },    { status: 403 });
 
@@ -54,7 +51,7 @@ export async function GET(request) {
 // PATCH — verify, suspend, unsuspend, approve_id, reject_id
 export async function PATCH(request) {
   try {
-    const admin = getAuthUser(request);
+    const admin = await getAuthUser(request);
     if (!admin)                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (admin.role !== 'admin') return NextResponse.json({ error: 'Forbidden' },    { status: 403 });
 
@@ -116,7 +113,7 @@ export async function PATCH(request) {
 // DELETE — permanently remove a user and all their data
 export async function DELETE(request) {
   try {
-    const admin = getAuthUser(request);
+    const admin = await getAuthUser(request);
     if (!admin)                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (admin.role !== 'admin') return NextResponse.json({ error: 'Forbidden' },    { status: 403 });
 

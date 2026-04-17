@@ -25,8 +25,19 @@ export async function GET(request) {
     return clean;
   });
 
+  // FIX 1: rows[0] was undefined on an empty table, crashing Object.keys().
+  // Return an empty CSV body instead of throwing a TypeError.
+  if (rows.length === 0) {
+    return new NextResponse('', {
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="rentbw_${type}_${new Date().toISOString().slice(0, 10)}.csv"`,
+      },
+    });
+  }
+
   const csv = [
-    Object.keys(rows[0] || {}).join(','),
+    Object.keys(rows[0]).join(','),
     ...rows.map(row => Object.values(row).map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
   ].join('\n');
 

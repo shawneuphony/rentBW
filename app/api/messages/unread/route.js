@@ -10,10 +10,10 @@ export async function GET(request) {
 
     const db = await getDb();
     const result = await db.get(
-      'SELECT COUNT(*) as count FROM messages WHERE receiver_id = ? AND read = 0',
-      user.id
+      'SELECT COUNT(*) as count FROM messages WHERE receiver_id = ? AND "read" = 0',
+      [user.id]
     );
-    return NextResponse.json({ count: result.count });
+    return NextResponse.json({ count: result?.count ?? 0 });
   } catch (err) {
     console.error('Unread count error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

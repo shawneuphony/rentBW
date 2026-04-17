@@ -1,40 +1,37 @@
+// app/api/user/settings/route.js
+//
+// FIX 4: This route duplicated /api/tenant/settings but wrote to a different
+// storage location (user_settings table vs. users.settings column). Pages using
+// different endpoints would silently lose each other's settings.
+//
+// The canonical endpoint is /api/tenant/settings (GET / PATCH).
+// This file is kept as a redirect/proxy shim so any existing fetch() calls
+// don't hard-404, but all real logic now lives in the canonical route.
+
 import { NextResponse } from 'next/server';
-import { getDb } from '@/app/lib/utils/db';
-import { getAuthUser } from '@/app/lib/utils/getAuthUser';
 
+const CANONICAL = '/api/tenant/settings';
+
+// GET → 308 permanent redirect to canonical route (browsers and fetch() follow it)
 export async function GET(request) {
-  try {
-    const user = await getAuthUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const db = await getDb();
-    const row = await db.get('SELECT preferences FROM user_settings WHERE user_id = ?', user.id);
-    const defaults = {
-      notifications: { email: true, push: true, sms: false, marketing: false },
-      privacy: { showProfile: true, showApplications: false },
-      language: 'English',
-      theme: 'light',
-    };
-    if (!row) return NextResponse.json(defaults);
-    return NextResponse.json({ ...defaults, ...JSON.parse(row.preferences) });
-  } catch (err) {
-    return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 });
-  }
+  const dest = new URL(CANONICAL, request.url);
+  return NextResponse.redirect(dest, { status: 308 });
 }
 
-export async function PUT(request) {
-  try {
-    const user = await getAuthUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const body = await request.json();
-    const db = await getDb();
-    await db.run(
-      `INSERT INTO user_settings (user_id, preferences, updated_at)
-       VALUES (?, ?, ?)
-       ON CONFLICT(user_id) DO UPDATE SET preferences = ?, updated_at = ?`,
-      [user.id, JSON.stringify(body), Date.now(), JSON.stringify(body), Date.now()]
-    );
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 });
-  }
+// PUT/PATCH → proxy as PATCH to canonical route.
+// 308 preserves the body but cannot change the method, so we forward manually.
+async function proxyAsPatch(request) {
+  const body = await request.text();
+  const dest = new URL(CANONICAL, request.url);
+  return fetch(dest.toString(), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      cookie: request.headers.get('cookie') ?? '',
+    },
+    body,
+  });
 }
+
+export async function PUT(request)   { return proxyAsPatch(request); }
+export async function PATCH(request) { return proxyAsPatch(request); }

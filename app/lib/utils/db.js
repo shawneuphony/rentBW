@@ -6,159 +6,164 @@ import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-let db = null;
+let dbPromise = null;
 
 export async function getDb() {
-  if (db) return db;
+  if (dbPromise) return dbPromise;
 
-  console.log('📁 Opening database connection...');
+  dbPromise = (async () => {
+    console.log('📁 Opening database connection...');
 
-  db = await open({
-    filename: path.join(__dirname, '../../../rentbw.db'),
-    driver: sqlite3.Database
-  });
+    const db = await open({
+      filename: path.join(__dirname, '../../../rentbw.db'),
+      driver: sqlite3.Database
+    });
 
-  await db.exec(`
-
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS user_settings (
-    user_id TEXT PRIMARY KEY,
-    preferences TEXT NOT NULL,
-    updated_at INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
+        user_id TEXT PRIMARY KEY,
+        preferences TEXT NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
 
       CREATE TABLE IF NOT EXISTS password_resets (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    token TEXT NOT NULL,
-    expires_at INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        token TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
 
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      name TEXT NOT NULL,
-      phone TEXT,
-      role TEXT NOT NULL DEFAULT 'tenant',
-      verified INTEGER DEFAULT 0,
-      avatar TEXT,
-      id_document TEXT,
-      id_document_status TEXT DEFAULT 'none',
-      verification_token TEXT,
-      reset_token TEXT,
-      reset_token_exp INTEGER,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        name TEXT NOT NULL,
+        phone TEXT,
+        role TEXT NOT NULL DEFAULT 'tenant',
+        verified INTEGER DEFAULT 0,
+        avatar TEXT,
+        settings TEXT,
+        id_document TEXT,
+        id_document_status TEXT DEFAULT 'none',
+        verification_token TEXT,
+        reset_token TEXT,
+        reset_token_exp INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
 
-    CREATE TABLE IF NOT EXISTS properties (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      description TEXT,
-      price REAL NOT NULL,
-      location TEXT NOT NULL,
-      beds INTEGER,
-      baths REAL,
-      sqm REAL,
-      type TEXT,
-      status TEXT DEFAULT 'pending',
-      featured INTEGER DEFAULT 0,
-      verified INTEGER DEFAULT 0,
-      images TEXT,
-      amenities TEXT,
-      landlord_id TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      FOREIGN KEY (landlord_id) REFERENCES users(id)
-    );
+      CREATE TABLE IF NOT EXISTS properties (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        price REAL NOT NULL,
+        location TEXT NOT NULL,
+        beds INTEGER,
+        baths REAL,
+        sqm REAL,
+        type TEXT,
+        status TEXT DEFAULT 'pending',
+        featured INTEGER DEFAULT 0,
+        verified INTEGER DEFAULT 0,
+        images TEXT,
+        amenities TEXT,
+        landlord_id TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (landlord_id) REFERENCES users(id)
+      );
 
-    CREATE TABLE IF NOT EXISTS saved_properties (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      property_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (property_id) REFERENCES properties(id),
-      UNIQUE(user_id, property_id)
-    );
+      CREATE TABLE IF NOT EXISTS saved_properties (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        property_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (property_id) REFERENCES properties(id),
+        UNIQUE(user_id, property_id)
+      );
 
-    CREATE TABLE IF NOT EXISTS property_views (
-      id TEXT PRIMARY KEY,
-      property_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (property_id) REFERENCES properties(id)
-    );
+      CREATE TABLE IF NOT EXISTS property_views (
+        id TEXT PRIMARY KEY,
+        property_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (property_id) REFERENCES properties(id)
+      );
 
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      content TEXT NOT NULL,
-      read INTEGER DEFAULT 0,
-      sender_id TEXT NOT NULL,
-      receiver_id TEXT NOT NULL,
-      property_id TEXT,
-      parent_id TEXT,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (sender_id) REFERENCES users(id),
-      FOREIGN KEY (receiver_id) REFERENCES users(id),
-      FOREIGN KEY (property_id) REFERENCES properties(id),
-      FOREIGN KEY (parent_id) REFERENCES messages(id)
-    );
+      CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        read INTEGER DEFAULT 0,
+        sender_id TEXT NOT NULL,
+        receiver_id TEXT NOT NULL,
+        property_id TEXT,
+        parent_id TEXT,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (sender_id) REFERENCES users(id),
+        FOREIGN KEY (receiver_id) REFERENCES users(id),
+        FOREIGN KEY (property_id) REFERENCES properties(id),
+        FOREIGN KEY (parent_id) REFERENCES messages(id)
+      );
 
-    CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id, read, created_at);
-    CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_messages_property ON messages(property_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id, read, created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_property ON messages(property_id);
 
-    CREATE TABLE IF NOT EXISTS applications (
-      id TEXT PRIMARY KEY,
-      status TEXT DEFAULT 'pending',
-      documents TEXT,
-      notes TEXT,
-      tenant_id TEXT NOT NULL,
-      property_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      FOREIGN KEY (tenant_id) REFERENCES users(id),
-      FOREIGN KEY (property_id) REFERENCES properties(id)
-    );
-  `);
+      CREATE TABLE IF NOT EXISTS applications (
+        id TEXT PRIMARY KEY,
+        status TEXT DEFAULT 'pending',
+        documents TEXT,
+        notes TEXT,
+        tenant_id TEXT NOT NULL,
+        property_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (tenant_id) REFERENCES users(id),
+        FOREIGN KEY (property_id) REFERENCES properties(id)
+      );
+    `);
 
-  // Migrations: add columns if they don't exist
-  const userCols = await db.all("PRAGMA table_info(users)");
-  const colNames = userCols.map(c => c.name);
-  if (!colNames.includes('avatar')) await db.run("ALTER TABLE users ADD COLUMN avatar TEXT");
-  if (!colNames.includes('id_document')) await db.run("ALTER TABLE users ADD COLUMN id_document TEXT");
-  if (!colNames.includes('id_document_status')) await db.run("ALTER TABLE users ADD COLUMN id_document_status TEXT DEFAULT 'none'");
+    // Migrations: add columns if they don't exist
+    const userCols = await db.all("PRAGMA table_info(users)");
+    const colNames = userCols.map(c => c.name);
+    if (!colNames.includes('avatar'))             await db.run("ALTER TABLE users ADD COLUMN avatar TEXT");
+    if (!colNames.includes('id_document'))        await db.run("ALTER TABLE users ADD COLUMN id_document TEXT");
+    if (!colNames.includes('id_document_status')) await db.run("ALTER TABLE users ADD COLUMN id_document_status TEXT DEFAULT 'none'");
+    if (!colNames.includes('settings'))           await db.run("ALTER TABLE users ADD COLUMN settings TEXT");
 
-  // Saved reports table
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS saved_reports (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      type TEXT NOT NULL,
-      params TEXT,
-      data TEXT,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-  `);
+    // Saved reports table
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS saved_reports (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        type TEXT NOT NULL,
+        params TEXT,
+        data TEXT,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+    `);
 
-  // Migrations: properties table
-  const propCols = await db.all("PRAGMA table_info(properties)");
-  const propColNames = propCols.map(c => c.name);
-  if (!propColNames.includes('lease_url')) await db.run("ALTER TABLE properties ADD COLUMN lease_url TEXT DEFAULT ''");
-  if (!propColNames.includes('views')) await db.run("ALTER TABLE properties ADD COLUMN views INTEGER DEFAULT 0");
+    // Migrations: properties table
+    const propCols = await db.all("PRAGMA table_info(properties)");
+    const propColNames = propCols.map(c => c.name);
+    if (!propColNames.includes('lease_url')) await db.run("ALTER TABLE properties ADD COLUMN lease_url TEXT DEFAULT ''");
+    if (!propColNames.includes('views'))     await db.run("ALTER TABLE properties ADD COLUMN views INTEGER DEFAULT 0");
 
-  const userCount = await db.get('SELECT COUNT(*) as count FROM users');
-  if (userCount.count === 0) {
-    console.log('👥 No users found, creating demo users...');
-    await createDemoUsers(db);
-  }
+    const userCount = await db.get('SELECT COUNT(*) as count FROM users');
+    if (userCount.count === 0) {
+      console.log('👥 No users found, creating demo users...');
+      await createDemoUsers(db);
+    }
 
-  return db;
+    return db;
+  })();
+
+  return dbPromise;
 }
 
 async function createDemoUsers(db) {

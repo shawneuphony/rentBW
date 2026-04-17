@@ -14,13 +14,13 @@ export async function GET(request) {
 
     const [totalListings, activeListings, pendingListings, totalViews, totalInquiries, unreadInquiries, repliedCount] =
       await Promise.all([
-        db.get('SELECT COUNT(*) as count FROM properties WHERE landlord_id = ?', user.id),
-        db.get("SELECT COUNT(*) as count FROM properties WHERE landlord_id = ? AND status = 'active'", user.id),
-        db.get("SELECT COUNT(*) as count FROM properties WHERE landlord_id = ? AND status = 'pending'", user.id),
+        db.get('SELECT COUNT(*) as count FROM properties WHERE landlord_id = ?', [user.id]),
+        db.get("SELECT COUNT(*) as count FROM properties WHERE landlord_id = ? AND status = 'active'", [user.id]),
+        db.get("SELECT COUNT(*) as count FROM properties WHERE landlord_id = ? AND status = 'pending'", [user.id]),
         db.get(
           `SELECT COUNT(*) as count FROM property_views pv
            JOIN properties p ON pv.property_id = p.id
-           WHERE p.landlord_id = ?`, user.id
+           WHERE p.landlord_id = ?`, [user.id]
         ),
         db.get(
           `SELECT COUNT(*) as count FROM messages m
@@ -30,16 +30,16 @@ export async function GET(request) {
         db.get(
           `SELECT COUNT(*) as count FROM messages m
            JOIN properties p ON m.property_id = p.id
-           WHERE p.landlord_id = ? AND m.receiver_id = ? AND m.read = 0`, [user.id, user.id]
+           WHERE p.landlord_id = ? AND m.receiver_id = ? AND m."read" = 0`, [user.id, user.id]
         ),
         db.get(
           `SELECT COUNT(DISTINCT parent_id) as count FROM messages
-           WHERE sender_id = ? AND parent_id IS NOT NULL`, user.id
+           WHERE sender_id = ? AND parent_id IS NOT NULL`, [user.id]
         ),
       ]);
 
-    const responseRate = totalInquiries.count > 0
-      ? Math.round((repliedCount.count / totalInquiries.count) * 100)
+    const responseRate = (totalInquiries?.count || 0) > 0
+      ? Math.round(((repliedCount?.count || 0) / (totalInquiries?.count || 0)) * 100)
       : 100;
 
     // View trends — last 7 days grouped by date
@@ -63,12 +63,12 @@ export async function GET(request) {
     const viewTrends = Object.entries(viewsByDay).map(([date, views]) => ({ date, views }));
 
     return NextResponse.json({
-      totalListings: totalListings.count,
-      activeListings: activeListings.count,
-      pendingListings: pendingListings.count,
-      totalViews: totalViews.count,
-      totalInquiries: totalInquiries.count,
-      unreadCount: unreadInquiries.count,
+      totalListings: totalListings?.count || 0,
+      activeListings: activeListings?.count || 0,
+      pendingListings: pendingListings?.count || 0,
+      totalViews: totalViews?.count || 0,
+      totalInquiries: totalInquiries?.count || 0,
+      unreadCount: unreadInquiries?.count || 0,
       responseRate,
       viewTrends,
     });

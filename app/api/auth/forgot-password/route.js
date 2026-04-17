@@ -7,8 +7,7 @@ import { randomBytes } from 'crypto';
 const TOKEN_TTL_MS = 60 * 60 * 1000;
 
 // POST /api/auth/forgot-password  { email }
-// Stores a reset token in the DB. In production you would email the link;
-// here the token is returned in the response so you can test without an SMTP server.
+// Stores a reset token in the DB and (in production) emails the reset link.
 export async function POST(request) {
   try {
     const { email } = await request.json();
@@ -32,15 +31,19 @@ export async function POST(request) {
       [token, expiry, Date.now(), user.id]
     );
 
-    // TODO: send email here. For now return token so the reset flow can be tested.
-    // In production: remove resetToken from the response and email the link instead.
-    const resetLink = `/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+    // PRE-PROD FIX 6: resetToken and resetLink were returned in the JSON
+    // response for dev convenience. That must never reach production — it
+    // lets anyone trigger a password reset for any account by simply reading
+    // the API response. Wire up an email/SMS delivery here instead.
+    //
+    // The reset link to deliver out-of-band:
+    //   /auth/reset-password?token=<token>&email=<encoded-email>
+    //
+    // Example with a transactional email service (nodemailer, Resend, etc.):
+    //   await sendResetEmail({ to: email, token, resetLink });
 
     return NextResponse.json({
       message: 'If that email is registered, a reset link has been sent.',
-      // Dev only — remove before going to production:
-      resetToken: token,
-      resetLink,
     });
   } catch (err) {
     console.error('Forgot password error:', err);

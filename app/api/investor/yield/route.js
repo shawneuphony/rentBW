@@ -6,7 +6,12 @@ import { getAuthUser } from '@/app/lib/utils/getAuthUser';
 export async function GET(request) {
   try {
     const user = await getAuthUser(request);
-    if (!user || user.role !== 'investor') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // FIX 3: Previously only 'investor' was allowed, blocking admins. Every
+    // other investor/* route already permits admins. Made consistent here.
+    if (!user || (user.role !== 'investor' && user.role !== 'admin')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const db = await getDb();
     const properties = await db.all(

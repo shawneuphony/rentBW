@@ -70,25 +70,13 @@ export async function PATCH(request) {
       theme:         body.theme    ?? existing.theme    ?? DEFAULT_SETTINGS.theme,
     };
 
-    // Persist — we store settings as a JSON string in the users.settings column.
-    // The column is added via migration below if it doesn't exist yet.
-    try {
-      await db.run(
-        'UPDATE users SET settings = ?, updated_at = ? WHERE id = ?',
-        [JSON.stringify(updated), Date.now(), user.id]
-      );
-    } catch (colErr) {
-      // Column may not exist yet — add it and retry once
-      if (String(colErr).includes('no column named settings')) {
-        await db.run('ALTER TABLE users ADD COLUMN settings TEXT');
-        await db.run(
-          'UPDATE users SET settings = ?, updated_at = ? WHERE id = ?',
-          [JSON.stringify(updated), Date.now(), user.id]
-        );
-      } else {
-        throw colErr;
-      }
-    }
+    // FIX 2b: The lazy try/catch that added the column on first PATCH is removed.
+    // users.settings is now guaranteed to exist at DB init (see db.js fix), so
+    // this write is unconditional and any real SQL error will surface properly.
+    await db.run(
+      'UPDATE users SET settings = ?, updated_at = ? WHERE id = ?',
+      [JSON.stringify(updated), Date.now(), user.id]
+    );
 
     return NextResponse.json({ settings: updated });
   } catch (err) {
