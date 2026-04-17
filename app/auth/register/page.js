@@ -32,16 +32,11 @@ export default function RegisterPage() {
     // Role Selection
     role: '',
     
-    // Additional Info based on role
-    // Tenant
+    // Additional Info based on role (not used in MVP backend, but kept for future)
     monthlyBudget: '',
     preferredLocations: [],
-    
-    // Landlord
     companyName: '',
     businessReg: '',
-    
-    // Investor
     investmentBudget: '',
     investorType: '',
     
@@ -53,19 +48,15 @@ export default function RegisterPage() {
 
   const validateStep1 = () => {
     const newErrors = {};
-    
     if (!formData.fullName) newErrors.fullName = 'Full name is required';
     if (!formData.email) newErrors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
-    
     if (!formData.phone) newErrors.phone = 'Phone number is required';
     if (!formData.password) newErrors.password = 'Password is required';
     else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
-    
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-    
     return newErrors;
   };
 
@@ -87,8 +78,6 @@ export default function RegisterPage() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
-    // Clear error for this field
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
@@ -105,25 +94,19 @@ export default function RegisterPage() {
 
   const handleNext = () => {
     let stepErrors = {};
-    
     if (step === 1) stepErrors = validateStep1();
     else if (step === 2) stepErrors = validateStep2();
-    
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
       return;
     }
-    
     setStep(step + 1);
   };
 
-  const handleBack = () => {
-    setStep(step - 1);
-  };
+  const handleBack = () => setStep(step - 1);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     const step3Errors = validateStep3();
     if (Object.keys(step3Errors).length > 0) {
       setErrors(step3Errors);
@@ -131,19 +114,28 @@ export default function RegisterPage() {
     }
 
     setIsLoading(true);
+    setErrors({});
 
-    // Simulate API call
-    setTimeout(() => {
-      // Store user info (in production, this would be a real API call)
-      localStorage.setItem('token', 'mock-jwt-token');
-      localStorage.setItem('user', JSON.stringify({
-        name: formData.fullName,
-        email: formData.email,
-        role: formData.role
-      }));
+    try {
+      // Call the real registration API
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          role: formData.role,
+        }),
+      });
 
-      // Redirect based on role
-      switch(formData.role) {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+      // Registration successful – cookie already set by API
+      // Redirect to the appropriate dashboard based on role
+      switch (formData.role) {
         case 'tenant':
           router.push('/tenant/dashboard');
           break;
@@ -156,13 +148,15 @@ export default function RegisterPage() {
         default:
           router.push('/');
       }
-      
+    } catch (err) {
+      setErrors({ form: err.message });
+    } finally {
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   const locations = [
-    'Phakalane', 'Broadhurst', 'Block 8', 'CBD', 
+    'Phakalane', 'Broadhurst', 'Block 8', 'CBD',
     'G-West', 'Tlokweng', 'Kgale View', 'Phase 2'
   ];
 
@@ -212,6 +206,12 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          {errors.form && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+              {errors.form}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Step 1: Account Information */}
             {step === 1 && (
@@ -229,9 +229,7 @@ export default function RegisterPage() {
                       placeholder="John Doe"
                     />
                   </div>
-                  {errors.fullName && (
-                    <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>
-                  )}
+                  {errors.fullName && <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>}
                 </div>
 
                 <div>
@@ -247,9 +245,7 @@ export default function RegisterPage() {
                       placeholder="you@example.com"
                     />
                   </div>
-                  {errors.email && (
-                    <p className="mt-1 text-xs text-red-600">{errors.email}</p>
-                  )}
+                  {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
                 </div>
 
                 <div>
@@ -265,9 +261,7 @@ export default function RegisterPage() {
                       placeholder="+267 71 234 567"
                     />
                   </div>
-                  {errors.phone && (
-                    <p className="mt-1 text-xs text-red-600">{errors.phone}</p>
-                  )}
+                  {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
                 </div>
 
                 <div>
@@ -294,9 +288,7 @@ export default function RegisterPage() {
                       )}
                     </button>
                   </div>
-                  {errors.password && (
-                    <p className="mt-1 text-xs text-red-600">{errors.password}</p>
-                  )}
+                  {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
                 </div>
 
                 <div>
@@ -323,9 +315,7 @@ export default function RegisterPage() {
                       )}
                     </button>
                   </div>
-                  {errors.confirmPassword && (
-                    <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>
-                  )}
+                  {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>}
                 </div>
               </div>
             )}
@@ -358,18 +348,14 @@ export default function RegisterPage() {
                       </button>
                     ))}
                   </div>
-                  {errors.role && (
-                    <p className="mt-2 text-xs text-red-600">{errors.role}</p>
-                  )}
+                  {errors.role && <p className="mt-2 text-xs text-red-600">{errors.role}</p>}
                 </div>
 
-                {/* Role-specific fields */}
+                {/* Role‑specific optional fields (stored for future use, not required for MVP) */}
                 {formData.role === 'tenant' && (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700">
-                        Monthly Budget (BWP)
-                      </label>
+                      <label className="block text-sm font-medium text-slate-700">Monthly Budget (BWP)</label>
                       <input
                         type="number"
                         name="monthlyBudget"
@@ -380,9 +366,7 @@ export default function RegisterPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Preferred Locations
-                      </label>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Preferred Locations</label>
                       <div className="grid grid-cols-2 gap-2">
                         {locations.map(loc => (
                           <label key={loc} className="flex items-center gap-2">
@@ -403,9 +387,7 @@ export default function RegisterPage() {
                 {formData.role === 'landlord' && (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700">
-                        Company Name (Optional)
-                      </label>
+                      <label className="block text-sm font-medium text-slate-700">Company Name (Optional)</label>
                       <input
                         type="text"
                         name="companyName"
@@ -416,9 +398,7 @@ export default function RegisterPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700">
-                        Business Registration Number
-                      </label>
+                      <label className="block text-sm font-medium text-slate-700">Business Registration Number</label>
                       <input
                         type="text"
                         name="businessReg"
@@ -434,9 +414,7 @@ export default function RegisterPage() {
                 {formData.role === 'investor' && (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700">
-                        Investment Budget (BWP)
-                      </label>
+                      <label className="block text-sm font-medium text-slate-700">Investment Budget (BWP)</label>
                       <input
                         type="number"
                         name="investmentBudget"
@@ -447,9 +425,7 @@ export default function RegisterPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700">
-                        Investor Type
-                      </label>
+                      <label className="block text-sm font-medium text-slate-700">Investor Type</label>
                       <select
                         name="investorType"
                         value={formData.investorType}
@@ -473,22 +449,10 @@ export default function RegisterPage() {
                 <div className="bg-slate-50 p-4 rounded-lg">
                   <h3 className="font-bold mb-3">Account Summary</h3>
                   <dl className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <dt className="text-slate-500">Name:</dt>
-                      <dd className="font-medium">{formData.fullName}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt className="text-slate-500">Email:</dt>
-                      <dd className="font-medium">{formData.email}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt className="text-slate-500">Phone:</dt>
-                      <dd className="font-medium">{formData.phone}</dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt className="text-slate-500">Role:</dt>
-                      <dd className="font-medium capitalize">{formData.role}</dd>
-                    </div>
+                    <div className="flex justify-between"><dt className="text-slate-500">Name:</dt><dd className="font-medium">{formData.fullName}</dd></div>
+                    <div className="flex justify-between"><dt className="text-slate-500">Email:</dt><dd className="font-medium">{formData.email}</dd></div>
+                    <div className="flex justify-between"><dt className="text-slate-500">Phone:</dt><dd className="font-medium">{formData.phone}</dd></div>
+                    <div className="flex justify-between"><dt className="text-slate-500">Role:</dt><dd className="font-medium capitalize">{formData.role}</dd></div>
                   </dl>
                 </div>
 
@@ -503,18 +467,12 @@ export default function RegisterPage() {
                     />
                     <span className="text-sm text-slate-600">
                       I agree to the{' '}
-                      <Link href="/terms" className="text-primary hover:underline">
-                        Terms of Service
-                      </Link>{' '}
+                      <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>{' '}
                       and{' '}
-                      <Link href="/privacy" className="text-primary hover:underline">
-                        Privacy Policy
-                      </Link>
+                      <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
                     </span>
                   </label>
-                  {errors.agreeToTerms && (
-                    <p className="text-xs text-red-600">{errors.agreeToTerms}</p>
-                  )}
+                  {errors.agreeToTerms && <p className="text-xs text-red-600">{errors.agreeToTerms}</p>}
 
                   <label className="flex items-start gap-3">
                     <input
@@ -540,7 +498,6 @@ export default function RegisterPage() {
                   Back
                 </button>
               )}
-              
               {step < 3 ? (
                 <button
                   type="button"

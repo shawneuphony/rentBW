@@ -4,6 +4,18 @@ import { getDb } from '@/app/lib/utils/db';
 import { getAuthUser } from '@/app/lib/utils/getAuthUser';
 import { randomUUID } from 'crypto';
 
+// Helper to safely parse JSON fields
+function safeJsonParse(value, fallback = []) {
+  if (Array.isArray(value)) return value;
+  if (!value) return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function GET(request) {
   try {
     const db = await getDb();
@@ -14,48 +26,43 @@ export async function GET(request) {
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
     const beds     = searchParams.get('beds');
+    const sort     = searchParams.get('sort');
+    const limit    = searchParams.get('limit');
 
     let query = "SELECT * FROM properties WHERE status = 'active'";
     const params = [];
 
     if (location) { query += ' AND location LIKE ?';  params.push(`%${location}%`); }
-    if (type)     { query += ' AND type = ?';          params.push(type); }
+    if (type && type !== 'all') { query += ' AND type = ?'; params.push(type); }
     if (minPrice) { query += ' AND price >= ?';        params.push(Number(minPrice)); }
     if (maxPrice) { query += ' AND price <= ?';        params.push(Number(maxPrice)); }
-    if (beds)     { query += ' AND beds >= ?';         params.push(Number(beds)); }
+    if (beds && beds !== 'any') { query += ' AND beds >= ?'; params.push(Number(beds)); }
 
-    const sort  = searchParams.get('sort');
-    const limit = searchParams.get('limit');
-
+    // Sort order – removed 'views' because column doesn't exist
     if (sort === 'trending') {
-      query += ' ORDER BY views DESC, created_at DESC';
+      query += ' ORDER BY created_at DESC';
     } else {
       query += ' ORDER BY created_at DESC';
     }
 
     if (limit) {
-      query += ` LIMIT ${Math.min(Math.abs(parseInt(limit, 10)) || 6, 50)}`;
+      const limitNum = Math.min(Math.abs(parseInt(limit, 10)) || 6, 50);
+      query += ` LIMIT ${limitNum}`;
     }
 
     const rawProperties = await db.all(query, params);
 
-    // Parse JSON fields so clients get arrays, not strings
+    // Parse JSON fields safely
     const properties = rawProperties.map(p => ({
       ...p,
-      images: (() => {
-        if (Array.isArray(p.images)) return p.images;
-        try { const a = JSON.parse(p.images); return Array.isArray(a) ? a : []; } catch { return []; }
-      })(),
-      amenities: (() => {
-        if (Array.isArray(p.amenities)) return p.amenities;
-        try { const a = JSON.parse(p.amenities); return Array.isArray(a) ? a : []; } catch { return []; }
-      })(),
+      images: safeJsonParse(p.images, []),
+      amenities: safeJsonParse(p.amenities, []),
     }));
 
     return NextResponse.json({ properties });
   } catch (err) {
     console.error('Properties GET error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -67,7 +74,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Fix #4 — enforce ID approval on the server side too
+    // Check ID approval for landlords
     if (user.role === 'landlord' && user.id_document_status !== 'approved') {
       return NextResponse.json(
         { error: 'Your identification must be approved before you can add listings.' },
@@ -83,7 +90,6 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Title, price and location are required' }, { status: 400 });
     }
 
-    // Fix #5 — require lease document on the server side too
     if (!lease_url) {
       return NextResponse.json({ error: 'A lease agreement document is required.' }, { status: 400 });
     }

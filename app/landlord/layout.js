@@ -15,7 +15,7 @@ import {
   ChevronDownIcon,
   PlusIcon,
   Bars3Icon,
-  XMarkIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 
 export default function LandlordLayout({ children }) {
@@ -23,6 +23,7 @@ export default function LandlordLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -31,10 +32,34 @@ export default function LandlordLayout({ children }) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Fetch pending applications count for badge
+  useEffect(() => {
+    async function fetchPendingCount() {
+      try {
+        const res = await fetch('/api/landlord/applications?status=pending', {
+          credentials: 'include',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPendingCount(data.applications?.length || 0);
+        }
+      } catch (err) {
+        console.error('Failed to fetch pending applications count:', err);
+      }
+    }
+    if (mounted) {
+      fetchPendingCount();
+      // Optional: refresh every 30 seconds
+      const interval = setInterval(fetchPendingCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [mounted]);
+
   const menuItems = [
     { path: '/landlord/dashboard', label: 'Dashboard', icon: ChartBarIcon },
-    { path: '/landlord/listings', label: 'My Listings', icon: BuildingOfficeIcon, badge: '3' },
-    { path: '/landlord/messages', label: 'Messages', icon: ChatBubbleLeftIcon, badge: '5' },
+    { path: '/landlord/listings', label: 'My Listings', icon: BuildingOfficeIcon, badge: null },
+    { path: '/landlord/applications', label: 'Applications', icon: DocumentTextIcon, badge: pendingCount > 0 ? pendingCount.toString() : null },
+    { path: '/landlord/messages', label: 'Messages', icon: ChatBubbleLeftIcon, badge: null },
     { path: '/landlord/analytics', label: 'Analytics', icon: ChartBarIcon },
     { path: '/landlord/profile', label: 'Profile', icon: Cog6ToothIcon },
   ];
@@ -80,7 +105,7 @@ export default function LandlordLayout({ children }) {
                 <Icon className="w-5 h-5" />
                 <span className="text-sm font-medium flex-1">{item.label}</span>
                 {item.badge && (
-                  <span className="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">
+                  <span className="bg-accent text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
                     {item.badge}
                   </span>
                 )}
@@ -150,15 +175,6 @@ export default function LandlordLayout({ children }) {
       </div>
 
       <style jsx global>{`
-        :root {
-          --surface: #f5f3ef;
-          --ink: #000000;
-          --ink-soft: #000000;
-          --accent: #c8a96e;
-          --text-muted: #6b6b6b;
-          --border-light: rgba(0, 0, 0, 0.08);
-          --ff-display: 'Playfair Display', Georgia, serif;
-        }
         .bg-surface { background: var(--surface); }
         .bg-accent { background: var(--accent); }
         .text-accent { color: var(--accent); }

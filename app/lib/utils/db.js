@@ -126,6 +126,24 @@ export async function getDb() {
       );
     `);
 
+    // Inside getDb() after other CREATE TABLE statements
+await db.exec(`
+  CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    read INTEGER DEFAULT 0,
+    data TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read);
+`);
+
     // Migrations: add columns if they don't exist
     const userCols = await db.all("PRAGMA table_info(users)");
     const colNames = userCols.map(c => c.name);

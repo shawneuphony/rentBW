@@ -4,6 +4,7 @@ import { getUserByEmail } from '@/app/lib/utils/db';
 import { comparePassword, generateToken } from '@/app/lib/utils/auth';
 
 export async function POST(request) {
+  console.log('🔐 Login API called');
   try {
     const { email, password } = await request.json();
 
@@ -13,11 +14,13 @@ export async function POST(request) {
 
     const user = await getUserByEmail(email);
     if (!user) {
+      console.log('❌ User not found:', email);
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
     const valid = await comparePassword(password, user.password);
     if (!valid) {
+      console.log('❌ Invalid password for:', email);
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
@@ -34,6 +37,7 @@ export async function POST(request) {
       sameSite: 'lax',
     });
 
+    console.log('✅ Login successful for:', email);
     return response;
   } catch (err) {
     console.error('Login error:', err);

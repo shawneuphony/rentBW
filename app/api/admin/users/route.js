@@ -1,17 +1,21 @@
 // app/api/admin/users/route.js
 import { NextResponse } from 'next/server';
 import { getDb } from '@/app/lib/utils/db';
-// FIX 5: The original file declared a local getAuthUser() that called only
-// verifyToken() — it trusted role claims from the JWT without re-fetching from
-// the DB. A user whose role was changed would retain admin access until their
-// token expired (up to 7 days). Replaced with the shared getAuthUser helper,
-// which re-fetches the live row from the DB on every request.
-import { getAuthUser } from '@/app/lib/utils/getAuthUser';
+import { verifyToken } from '@/app/lib/utils/auth';
+import { randomUUID } from 'crypto';
+
+function getAuthUser(request) {
+  const token =
+    request.cookies.get('token')?.value ||
+    request.headers.get('authorization')?.replace('Bearer ', '');
+  if (!token) return null;
+  return verifyToken(token);
+}
 
 // GET — list all users with optional filters
 export async function GET(request) {
   try {
-    const user = await getAuthUser(request);
+    const user = getAuthUser(request);
     if (!user)                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' },    { status: 403 });
 
@@ -51,7 +55,7 @@ export async function GET(request) {
 // PATCH — verify, suspend, unsuspend, approve_id, reject_id
 export async function PATCH(request) {
   try {
-    const admin = await getAuthUser(request);
+    const admin = getAuthUser(request);
     if (!admin)                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (admin.role !== 'admin') return NextResponse.json({ error: 'Forbidden' },    { status: 403 });
 
@@ -87,6 +91,13 @@ export async function PATCH(request) {
           "UPDATE users SET id_document_status = 'approved', updated_at = ? WHERE id = ?",
           [now, userId]
         );
+        // Create notification for the user
+        await db.run(
+          `INSERT INTO notifications (id, user_id, type, title, message, read, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [randomUUID(), userId, 'id_approved', 'ID Document Approved',
+           'Your identity document has been approved. You can now apply for properties.', 0, now]
+        );
         break;
       case 'reject_id':
         await db.run(
@@ -113,7 +124,7 @@ export async function PATCH(request) {
 // DELETE — permanently remove a user and all their data
 export async function DELETE(request) {
   try {
-    const admin = await getAuthUser(request);
+    const admin = getAuthUser(request);
     if (!admin)                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (admin.role !== 'admin') return NextResponse.json({ error: 'Forbidden' },    { status: 403 });
 
@@ -129,19 +140,12 @@ export async function DELETE(request) {
     }
 
     // Cascade: remove all user data in dependency order
-    // 1. Applications made by this tenant
     await db.run('DELETE FROM applications WHERE tenant_id = ?', userId);
-
-    // 2. Messages sent or received by this user
     await db.run('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', [userId, userId]);
-
-    // 3. Saved properties by this user
     await db.run('DELETE FROM saved_properties WHERE user_id = ?', userId);
-
-    // 4. Saved reports (investor)
     await db.run('DELETE FROM saved_reports WHERE user_id = ?', userId);
+    await db.run('DELETE FROM notifications WHERE user_id = ?', userId);
 
-    // 5. If landlord: clean up their properties and all related data
     const ownedProperties = await db.all('SELECT id FROM properties WHERE landlord_id = ?', userId);
     for (const { id } of ownedProperties) {
       await db.run('DELETE FROM applications     WHERE property_id = ?', id);
@@ -151,7 +155,6 @@ export async function DELETE(request) {
       await db.run('DELETE FROM properties       WHERE id = ?',          id);
     }
 
-    // 6. Finally delete the user
     await db.run('DELETE FROM users WHERE id = ?', userId);
 
     return NextResponse.json({ deleted: true, message: `User "${target.name}" has been permanently deleted.` });

@@ -21,19 +21,30 @@ function sanitizeUser(user) {
 }
 
 export async function GET(request) {
+  console.log('👤 /api/auth/me GET called');
   try {
     const token =
       request.cookies.get('token')?.value ||
       request.headers.get('authorization')?.replace('Bearer ', '');
 
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!token) {
+      console.log('❌ No token found');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const decoded = verifyToken(token);
-    if (!decoded) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    if (!decoded) {
+      console.log('❌ Invalid token');
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
 
     const user = await getUserById(decoded.id);
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!user) {
+      console.log('❌ User not found for id:', decoded.id);
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
 
+    console.log('✅ User data fetched for:', user.email);
     return NextResponse.json({ user: sanitizeUser(user) });
   } catch (err) {
     console.error('Me GET error:', err);
@@ -42,6 +53,7 @@ export async function GET(request) {
 }
 
 export async function PATCH(request) {
+  console.log('✏️ /api/auth/me PATCH called');
   try {
     const user = await getAuthUser(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -49,23 +61,14 @@ export async function PATCH(request) {
     const body = await request.json();
     const updates = {};
 
-    // Basic profile fields
-    if (typeof body.name === 'string' && body.name.trim()) {
-      updates.name = body.name.trim();
-    }
-    if (typeof body.phone === 'string') {
-      updates.phone = body.phone.trim();
-    }
-
-    // Avatar — base64 data URL, max ~2MB
+    if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim();
+    if (typeof body.phone === 'string') updates.phone = body.phone.trim();
     if (typeof body.avatar === 'string') {
       if (body.avatar.length > 2_200_000) {
         return NextResponse.json({ error: 'Avatar image too large (max 2MB)' }, { status: 400 });
       }
       updates.avatar = body.avatar;
     }
-
-    // ID Document — base64 data URL
     if (typeof body.id_document === 'string') {
       if (body.id_document.length > 5_000_000) {
         return NextResponse.json({ error: 'Document too large (max 5MB)' }, { status: 400 });
@@ -73,8 +76,6 @@ export async function PATCH(request) {
       updates.id_document = body.id_document;
       updates.id_document_status = 'pending';
     }
-
-    // Password change
     if (body.currentPassword && body.newPassword) {
       const valid = await bcrypt.compare(body.currentPassword, user.password);
       if (!valid) {
@@ -91,6 +92,7 @@ export async function PATCH(request) {
     }
 
     const updated = await updateUser(user.id, updates);
+    console.log('✅ User updated:', updated.email);
     return NextResponse.json({ user: sanitizeUser(updated) });
   } catch (err) {
     console.error('Me PATCH error:', err);

@@ -1,7 +1,7 @@
 // app/tenant/dashboard/page.js
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/app/lib/hooks/useAuth';
 import { useTenantData } from '@/app/lib/hooks/useTenantData';
@@ -15,6 +15,7 @@ import {
   MagnifyingGlassIcon,
   SparklesIcon,
   ArrowRightIcon,
+  BellIcon,
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 
@@ -35,15 +36,54 @@ export default function TenantDashboard() {
   const [recommended, setRecommended] = useState([]);
   const [recLoading, setRecLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => setMounted(true), []);
 
+  // Redirect if not tenant
   useEffect(() => {
     if (user && user.role !== 'tenant') {
       router.push(`/${user.role}/dashboard`);
     }
   }, [user, router]);
 
+  // Fetch notifications
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tenant/notifications');
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.notifications?.filter(n => !n.read).length || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+    }
+  }, [user, fetchNotifications]);
+
+  // Mark all as read
+  const markAllRead = async () => {
+    try {
+      await fetch('/api/tenant/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markAll: true }),
+      });
+      setNotifications(prev => prev.map(n => ({ ...n, read: 1 })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Failed to mark read', err);
+    }
+  };
+
+  // Load recommended properties
   useEffect(() => {
     async function loadRecommended() {
       try {
@@ -205,6 +245,36 @@ export default function TenantDashboard() {
             <Link href="/tenant/applications" className="block text-center text-sm text-accent mt-4 hover:underline">
               View all applications
             </Link>
+          </div>
+
+          {/* Notifications Card */}
+          <div className="bg-white rounded-2xl p-5 border border-border-light">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-border-light">
+              <div className="flex items-center gap-2">
+                <BellIcon className="w-5 h-5 text-accent" />
+                <h3 className="font-semibold">Notifications</h3>
+              </div>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} className="text-xs text-accent hover:underline">
+                  Mark all read
+                </button>
+              )}
+            </div>
+            {notifications.length === 0 ? (
+              <p className="text-text-muted text-center py-6">No notifications yet</p>
+            ) : (
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {notifications.slice(0, 5).map((n) => (
+                  <div key={n.id} className={`p-3 rounded-xl ${!n.read ? 'bg-accent/5 border-l-2 border-accent' : 'bg-surface'}`}>
+                    <p className="text-sm font-medium">{n.title}</p>
+                    <p className="text-xs text-text-muted mt-1">{n.message}</p>
+                    <p className="text-[10px] text-text-muted mt-2">
+                      {new Date(n.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Recent Messages */}
